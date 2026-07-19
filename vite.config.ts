@@ -4,7 +4,7 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const BASE_PATH = '/Syndicate_v2.0/';
+const BASE_PATH = '/Syndicate_v2.1/';
 
 export default defineConfig(() => {
   return {
