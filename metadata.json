@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Syndicate",
+  "description": "Secure encrypted decentralized chat and document storage platform designed for Telegram WebApp context.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
