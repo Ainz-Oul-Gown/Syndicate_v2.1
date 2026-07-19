@@ -247,11 +247,14 @@ export default function SettingsModal({
     try {
       hapticImpact("medium");
 
-      const { data, error } = await supabaseClient
-        .rpc('rename_my_profile', { new_name: trimmed })
-        .single();
-      if (error) throw error;
-      const savedName = data?.first_name || trimmed;
+        const { data: profileData, error } = await supabaseClient
+            .rpc('rename_my_profile', { new_name: trimmed })
+            .single();
+
+        if (error) throw error;
+
+        const updatedProfile = profileData as { first_name?: string } | null;
+        const savedName = updatedProfile?.first_name?.trim() || trimmed;
 
       // Update local storage alternate name if any
       const altUser = localStorage.getItem('synd_alt_user');
