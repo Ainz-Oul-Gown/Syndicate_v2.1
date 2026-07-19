@@ -29,7 +29,7 @@ Add these repository secrets under **Settings → Secrets and variables → Acti
 
 The workflow `.github/workflows/deploy.yml` injects them only during the Vite build. They are browser-visible by design. Security must be enforced with Supabase RLS and correct Firebase authorized domains.
 
-## Server-side secrets
+## Server-side secrets 
 
 Configure Edge Function secrets separately; do not add them to GitHub Pages build variables:
 
