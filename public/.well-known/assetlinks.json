@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.syndicate.app",
+        "sha256_cert_fingerprints": ["7E:6E:4C:8F:D0:23:39:3F:4F:12:E5:35:73:B6:75:83:5D:1F:B7:55:1D:92:10:EB:2A:26:B4:19:3A:DE:37:43"]
+      }
+    }]
