@@ -15,8 +15,11 @@ export default defineConfig(() => {
       tailwindcss(),
 
       VitePWA({
-        registerType: 'autoUpdate',
-        injectRegister: 'auto',
+        registerType: 'prompt',
+        injectRegister: false,
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
 
         includeAssets: [
           'icon.svg',
@@ -68,13 +71,8 @@ export default defineConfig(() => {
           ],
         },
 
-        workbox: {
-          globPatterns: [
-            '**/*.{js,css,html,ico,png,svg,webmanifest}',
-          ],
-          cleanupOutdatedCaches: true,
-          clientsClaim: true,
-          skipWaiting: true,
+        injectManifest: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         },
       }),
     ],

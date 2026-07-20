@@ -34,6 +34,7 @@ import { supabaseClient } from '../lib/supabase';
 import { base64ToArrayBuffer } from '../lib/crypto';
 import { hapticImpact } from '../lib/haptics';
 import * as idbKeyval from 'idb-keyval';
+import StartupScreen, { StartupState } from './StartupScreen';
 
 interface TelegramMiniAppContext {
   initData: string;
@@ -51,6 +52,8 @@ interface LoginScreenProps {
   deferredPrompt: any;
   setDeferredPrompt: (prompt: any) => void;
   telegramMiniAppContext?: TelegramMiniAppContext | null;
+  startupState?: StartupState;
+  onRetryStartup?: () => void;
 }
 
 // 24 Classic security words for Seed generation
@@ -62,7 +65,7 @@ const WORDS_POOL = [
   "vault", "oracle", "signal", "beacon"
 ];
 
-export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredPrompt, setDeferredPrompt, telegramMiniAppContext }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredPrompt, setDeferredPrompt, telegramMiniAppContext, startupState = 'loading', onRetryStartup = () => window.location.reload() }: LoginScreenProps) {
   // Main login views.
   const [viewMode, setViewMode] = useState<'qr' | 'alternative' | 'seed_register' | 'seed_login' | 'google_register' | 'google_login' | 'webauthn_auth' | 'telegram_auth' | 'telegram_miniapp_register' | 'email_auth' | 'email_otp_verify'>(
     telegramMiniAppContext ? 'telegram_miniapp_register' : 'qr',
@@ -1513,14 +1516,7 @@ const handleCopyText = (text: string) => {
       </div>
 
       {!isError ? (
-        <div className="flex flex-col items-center relative z-10 animate-pulse py-10">
-          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center mb-6 glow-primary">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          </div>
-          <p className="text-slate-300 text-sm max-w-[280px] leading-relaxed font-mono uppercase tracking-wider">
-            {loadingText}
-          </p>
-        </div>
+        <StartupScreen state={startupState} message={loadingText} onRetry={onRetryStartup} />
       ) : (
         <div className="flex flex-col items-center w-full max-w-md relative z-10 py-6 md:py-10">
           

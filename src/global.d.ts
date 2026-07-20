@@ -1,3 +1,5 @@
+/// <reference types="vite-plugin-pwa/react" />
+
 interface Window {
   Telegram?: {
     WebApp?: {

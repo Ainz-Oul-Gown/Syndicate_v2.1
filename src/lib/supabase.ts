@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { readSessionToken, writeSessionToken } from './sessionStorage';
+import { createOfflineError, isOnline, reportNetworkFailure, reportNetworkSuccess } from './network';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
@@ -55,13 +56,27 @@ export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       if (options) {
         options.headers = newHeaders;
       }
-      return fetch(url, options).then((response) => {
-        if (response.status === 401 && currentToken) {
-          setSupabaseToken(null);
-          window.dispatchEvent(new CustomEvent('syndicate:session-expired'));
-        }
-        return response;
-      });
+      if (!isOnline()) {
+        reportNetworkFailure();
+        return Promise.reject(createOfflineError());
+      }
+
+      return fetch(url, options)
+        .then((response) => {
+          reportNetworkSuccess();
+          if (response.status === 401 && currentToken) {
+            setSupabaseToken(null);
+            window.dispatchEvent(new CustomEvent('syndicate:session-expired'));
+          }
+          return response;
+        })
+        .catch((error) => {
+          if (!isOnline() || error instanceof TypeError) {
+            reportNetworkFailure();
+            throw createOfflineError();
+          }
+          throw error;
+        });
     },
   },
   realtime: {

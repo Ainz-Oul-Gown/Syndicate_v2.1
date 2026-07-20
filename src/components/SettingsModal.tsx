@@ -22,6 +22,8 @@ import {
   Calendar,
   AlertTriangle,
   Clock,
+  Bell,
+  Loader2,
 } from 'lucide-react';
 import CurrenciesScreen from './CurrenciesScreen';
 import DevicesScreen from './DevicesScreen';
@@ -30,6 +32,7 @@ import AiScreen from './AiScreen';
 import { applyTheme } from '../lib/theme';
 import { supabaseClient } from '../lib/supabase';
 import * as idbKeyval from 'idb-keyval';
+import { disablePushNotifications, enablePushNotifications, getPushState, type PushState } from '../lib/pushNotifications';
 
 const deriveAesKeyFromSeed = async (seed: string): Promise<CryptoKey> => {
   const encoder = new TextEncoder();
@@ -129,6 +132,8 @@ export default function SettingsModal({
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [nameBlockedMsLeft, setNameBlockedMsLeft] = useState<number | null>(null);
+  const [pushState, setPushState] = useState<PushState>('default');
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     if (nameBlockedMsLeft === null) return;
@@ -147,6 +152,30 @@ export default function SettingsModal({
   useEffect(() => {
     setNewName(userName);
   }, [userName]);
+
+  useEffect(() => {
+    void getPushState().then(setPushState);
+  }, []);
+
+  const handlePushToggle = async () => {
+    if (pushBusy || pushState === 'unsupported') return;
+    setPushBusy(true);
+    try {
+      if (pushState === 'enabled') {
+        await disablePushNotifications();
+      } else {
+        await enablePushNotifications();
+      }
+      setPushState(await getPushState());
+      hapticImpact('success');
+    } catch (error: any) {
+      setPushState(await getPushState());
+      hapticImpact('error');
+      alert(error?.message || 'Не удалось изменить настройки уведомлений');
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   useEffect(() => {
     // Read theme color
@@ -672,6 +701,33 @@ hapticImpact("selection");
                 <span className="text-sm font-medium">Мои монеты (Эмиссия)</span>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-500" />
+            </button>
+
+            {/* System push notifications */}
+            <button
+              onClick={handlePushToggle}
+              disabled={pushBusy || pushState === 'unsupported'}
+              className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 disabled:opacity-50 transition duration-150 cursor-pointer"
+            >
+              <div className="flex items-center gap-3 text-slate-300 min-w-0">
+                <Bell className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium block">Системные уведомления</span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    {pushState === 'unsupported' ? 'Не поддерживаются этим браузером или WebView' :
+                     pushState === 'denied' ? 'Заблокированы в настройках системы' :
+                     pushState === 'enabled' ? 'Работают в фоне для PWA и совместимого APK' :
+                     'Получать уведомления о новых сообщениях'}
+                  </span>
+                </div>
+              </div>
+              {pushBusy ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (
+                <span className={`text-[10px] font-mono font-bold border rounded-md px-2.5 py-0.5 tracking-wide uppercase ${
+                  pushState === 'enabled' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-900 border-slate-800 text-slate-500'
+                }`}>
+                  {pushState === 'enabled' ? 'ON' : pushState === 'denied' ? 'BLOCKED' : 'OFF'}
+                </span>
+              )}
             </button>
 
             {/* Devices */}

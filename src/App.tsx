@@ -1,5 +1,6 @@
 import { readSessionToken, writeSessionToken } from './lib/sessionStorage';
 import { LoginScreen } from './components/LoginScreen';
+import type { StartupState } from './components/StartupScreen';
 import { useState, useEffect, useRef } from 'react';
 import * as idbKeyval from 'idb-keyval';
 import {
@@ -26,6 +27,7 @@ import {
     Check,
     Activity,
     Search,
+    Pin,
 } from 'lucide-react';
 import { supabaseClient, setSupabaseToken, parseJwt, isSupabaseTokenUsable } from './lib/supabase';
 import { checkCryptoKeys, generateChatKey, encryptChatKeyForFriend, decryptChatKey, getFingerprint } from './lib/crypto';
@@ -37,6 +39,8 @@ import SettingsModal from './components/SettingsModal';
 import { applyTheme } from './lib/theme';
 import { hapticImpact } from './lib/haptics';
 import { auth } from './lib/firebase';
+import { DRAFT_CHANGED_EVENT, readDraftPreviews, type DraftChangedDetail } from './lib/drafts';
+import { listenForForegroundPush, refreshPushRegistration } from './lib/pushNotifications';
 
 type TelegramMiniAppContext = {
     initData: string;
@@ -47,12 +51,24 @@ type TelegramMiniAppContext = {
     photoUrl?: string | null;
 };
 
+type DraftPreview = {
+    chatId: string;
+    text: string;
+    updatedAt: number;
+    chatName?: string;
+    chatType?: Chat['type'];
+    friendId?: number;
+};
+
 export default function App() {
     const [currentUser, setCurrentUser] = useState<{ id: number; first_name: string } | null>(null);
     const [telegramMiniAppContext, setTelegramMiniAppContext] = useState<TelegramMiniAppContext | null>(null);
     const [myFingerprint, setMyFingerprint] = useState<string | null>(null);
     const [isAuth, setIsAuth] = useState(false);
-    const [loadingText, setLoadingText] = useState('Загрузка Синдиката...');
+    const [loadingText, setLoadingText] = useState('Проверяем сессию…');
+    const [startupState, setStartupState] = useState<StartupState>('loading');
+    const retryBootstrapRef = useRef<() => void>(() => window.location.reload());
+    const bootstrapRunningRef = useRef(false);
 
     // Navigation states
     const [activeScreen, setActiveScreen] = useState<'main' | 'chat' | 'sync_waiting'>('main');
@@ -73,6 +89,17 @@ export default function App() {
         window.Telegram?.WebApp?.ready?.();
         window.Telegram?.WebApp?.expand?.();
     }, []);
+
+    useEffect(() => {
+        let unsubscribe = () => {};
+        void listenForForegroundPush().then((fn) => { unsubscribe = fn; });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        void refreshPushRegistration();
+    }, [currentUser]);
 
     useEffect(() => {
         const handleBeforeInstallPrompt = (e: Event) => {
@@ -98,11 +125,209 @@ export default function App() {
     const [friends, setFriends] = useState<User[]>([]);
     const [friendRequests, setFriendRequests] = useState<any[]>([]);
     const [groupChats, setGroupChats] = useState<Chat[]>([]);
+    const [draftPreviews, setDraftPreviews] = useState<Record<string, DraftPreview>>({});
+    const [unreadChatIds, setUnreadChatIds] = useState<Set<string>>(new Set());
+    const [privateChatByFriendId, setPrivateChatByFriendId] = useState<Record<number, string>>({});
+    const [pinnedChatIds, setPinnedChatIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!currentUser) {
+            setDraftPreviews({});
+            return;
+        }
+
+        let disposed = false;
+        const loadDrafts = async () => {
+            const stored = await readDraftPreviews(currentUser.id);
+            if (disposed) return;
+            const next: Record<string, DraftPreview> = {};
+            for (const item of stored) {
+                next[item.chatId] = {
+                    chatId: item.chatId,
+                    text: item.text,
+                    updatedAt: item.draft.updatedAt,
+                    chatName: item.draft.chatName,
+                    chatType: item.draft.chatType,
+                    friendId: item.draft.friendId,
+                };
+            }
+            setDraftPreviews(next);
+        };
+
+        void loadDrafts();
+
+        const onDraftChanged = (event: Event) => {
+            const detail = (event as CustomEvent<DraftChangedDetail>).detail;
+            if (!detail || detail.userId !== currentUser.id) return;
+            setDraftPreviews((current) => {
+                const next = { ...current };
+                if (!detail.text.trim()) {
+                    delete next[detail.chat.id];
+                    return next;
+                }
+                next[detail.chat.id] = {
+                    chatId: detail.chat.id,
+                    text: detail.text,
+                    updatedAt: detail.updatedAt,
+                    chatName: detail.chat.name,
+                    chatType: detail.chat.type,
+                    friendId: detail.chat.friendId,
+                };
+                return next;
+            });
+        };
+
+        window.addEventListener(DRAFT_CHANGED_EVENT, onDraftChanged);
+        return () => {
+            disposed = true;
+            window.removeEventListener(DRAFT_CHANGED_EVENT, onDraftChanged);
+        };
+    }, [currentUser]);
+
+
+    const pinnedChatsStorageKey = currentUser ? `synd_pinned_chats_${currentUser.id}` : '';
+
+    useEffect(() => {
+        if (!pinnedChatsStorageKey) {
+            setPinnedChatIds(new Set());
+            return;
+        }
+        try {
+            const stored = JSON.parse(localStorage.getItem(pinnedChatsStorageKey) || '[]');
+            setPinnedChatIds(new Set(Array.isArray(stored) ? stored.filter((id) => typeof id === 'string') : []));
+        } catch {
+            setPinnedChatIds(new Set());
+        }
+    }, [pinnedChatsStorageKey]);
+
+    const toggleChatPin = (chatId: string) => {
+        if (!pinnedChatsStorageKey) return;
+        hapticImpact('selection');
+        setPinnedChatIds((current) => {
+            const next = new Set(current);
+            if (next.has(chatId)) next.delete(chatId); else next.add(chatId);
+            localStorage.setItem(pinnedChatsStorageKey, JSON.stringify([...next]));
+            return next;
+        });
+    };
+
+    const unreadStorageKey = currentUser ? `synd_unread_state_${currentUser.id}` : '';
+
+    const readUnreadState = () => {
+        if (!unreadStorageKey) return { initializedAt: Date.now(), readAt: {} as Record<string, number> };
+        try {
+            const raw = localStorage.getItem(unreadStorageKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    initializedAt: Number(parsed.initializedAt) || Date.now(),
+                    readAt: parsed.readAt && typeof parsed.readAt === 'object' ? parsed.readAt as Record<string, number> : {},
+                };
+            }
+        } catch (error) {
+            console.warn('Failed to read unread state', error);
+        }
+        const fresh = { initializedAt: Date.now(), readAt: {} as Record<string, number> };
+        if (unreadStorageKey) localStorage.setItem(unreadStorageKey, JSON.stringify(fresh));
+        return fresh;
+    };
+
+    const markChatRead = (chatId: string) => {
+        if (!chatId || !unreadStorageKey) return;
+        const state = readUnreadState();
+        state.readAt[chatId] = Date.now();
+        localStorage.setItem(unreadStorageKey, JSON.stringify(state));
+        setUnreadChatIds((current) => {
+            if (!current.has(chatId)) return current;
+            const next = new Set(current);
+            next.delete(chatId);
+            return next;
+        });
+    };
+
+    useEffect(() => {
+        if (!currentUser) {
+            setUnreadChatIds(new Set());
+            return;
+        }
+
+        let disposed = false;
+        const syncUnread = async () => {
+            const state = readUnreadState();
+            const oldestRead = Math.min(state.initializedAt, ...Object.values(state.readAt));
+            const { data, error } = await supabaseClient
+                .from('messages')
+                .select('chat_id, sender_id, created_at')
+                .neq('sender_id', currentUser.id)
+                .gt('created_at', new Date(oldestRead).toISOString())
+                .order('created_at', { ascending: false })
+                .limit(500);
+
+            if (error) {
+                console.warn('Failed to sync unread markers', error);
+                return;
+            }
+            if (disposed) return;
+
+            const next = new Set<string>();
+            for (const message of data || []) {
+                const readAt = state.readAt[message.chat_id] || state.initializedAt;
+                if (new Date(message.created_at).getTime() > readAt) next.add(message.chat_id);
+            }
+            if (activeScreen === 'chat' && activeChat?.id) next.delete(activeChat.id);
+            setUnreadChatIds(next);
+        };
+
+        void syncUnread();
+
+        const channel = supabaseClient
+            .channel(`unread-messages-${currentUser.id}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages' },
+                (payload: any) => {
+                    const message = payload.new;
+                    if (!message?.chat_id || message.sender_id === currentUser.id) return;
+                    if (activeScreen === 'chat' && activeChat?.id === message.chat_id) {
+                        markChatRead(message.chat_id);
+                        return;
+                    }
+                    setUnreadChatIds((current) => {
+                        if (current.has(message.chat_id)) return current;
+                        const next = new Set(current);
+                        next.add(message.chat_id);
+                        return next;
+                    });
+                },
+            )
+            .subscribe();
+
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') void syncUnread();
+        };
+        document.addEventListener('visibilitychange', onVisible);
+
+        return () => {
+            disposed = true;
+            document.removeEventListener('visibilitychange', onVisible);
+            void supabaseClient.removeChannel(channel);
+        };
+    }, [currentUser, activeScreen, activeChat?.id]);
+
+    const formatDraftPreview = (text: string) => {
+        const compact = text.replace(/\s+/g, ' ').trim();
+        return compact.length > 72 ? `${compact.slice(0, 72)}…` : compact;
+    };
+
+    const findPrivateDraft = (friendId: number) =>
+        (Object.values(draftPreviews) as DraftPreview[]).find((draft) => draft.chatType === 'private' && draft.friendId === friendId);
 
     // Input bindings
     const [friendIdInput, setFriendIdInput] = useState('');
     const [groupNameInput, setGroupNameInput] = useState('');
     const [searchSpinner, setSearchSpinner] = useState(false);
+    const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+    const [pendingFriendRequestId, setPendingFriendRequestId] = useState<string | null>(null);
 
     // Background Web Worker
     const workerRef = useRef<Worker | null>(null);
@@ -139,7 +364,7 @@ export default function App() {
         if (tgInitData) {
             const oldToken = readSessionToken();
             try {
-                setLoadingText('Проверка Telegram Mini App...');
+                setLoadingText('Проверяем сессию…');
                 setSupabaseToken(null); // Telegram initData validates the request independently.
 
                 const { data: result, error } = await supabaseClient.functions.invoke('tg-auth', {
@@ -177,7 +402,7 @@ export default function App() {
             const payload = parseJwt(tokenToUse);
 
             if (payload && payload.tg_id) {
-                setLoadingText('Связь с сервером...');
+                setLoadingText('Подключаемся…');
                 const { data } = await supabaseClient
                     .from('users')
                     .select('first_name')
@@ -594,10 +819,25 @@ export default function App() {
             if (myKeys && myKeys.length > 0) {
                 const chatIds = myKeys.map((k) => k.chat_id);
                 promises.push(
-                    supabaseClient.from('chats').select('id, name, type, created_at, created_by').in('id', chatIds).then(({ data: chatsData }) => {
-                        const groups = (chatsData || []).filter((c) => c.type === 'group');
+                    supabaseClient.from('chats').select('id, name, type, created_at, created_by').in('id', chatIds).then(async ({ data: chatsData }) => {
+                        const allChats = chatsData || [];
+                        const groups = allChats.filter((c) => c.type === 'group');
                         setGroupChats(groups);
                         localStorage.setItem('synd_cached_groups', JSON.stringify(groups));
+
+                        const privateIds = allChats.filter((c) => c.type === 'private').map((c) => c.id);
+                        if (privateIds.length > 0) {
+                            const { data: privateMembers } = await supabaseClient
+                                .from('chat_keys')
+                                .select('chat_id, user_id')
+                                .in('chat_id', privateIds)
+                                .neq('user_id', userId);
+                            const mapping: Record<number, string> = {};
+                            for (const member of privateMembers || []) mapping[member.user_id] = member.chat_id;
+                            setPrivateChatByFriendId(mapping);
+                        } else {
+                            setPrivateChatByFriendId({});
+                        }
                     })
                 );
             } else {
@@ -733,6 +973,7 @@ export default function App() {
                 };
             }
 
+            markChatRead(activeChatObj.id);
             setActiveChat(activeChatObj);
             setActiveScreen('chat');
         } catch (err) {
@@ -822,6 +1063,7 @@ export default function App() {
                 };
             }
 
+            markChatRead(activeChatObj.id);
             setActiveChat(activeChatObj);
             setActiveScreen('chat');
         } catch (err) {
@@ -831,6 +1073,7 @@ export default function App() {
 
     const handleOpenGroupChat = (g: Chat) => {
         hapticImpact("selection");
+        markChatRead(g.id);
         setActiveChat(g);
         setActiveScreen('chat');
     };
@@ -885,8 +1128,9 @@ export default function App() {
 
     // Group creation workflow
     const handleCreateGroup = async () => {
-        if (!groupNameInput.trim() || !currentUser) return;
+        if (!groupNameInput.trim() || !currentUser || isCreatingGroup) return;
 
+        setIsCreatingGroup(true);
         try {
             const gName = groupNameInput.trim();
             setGroupNameInput('');
@@ -931,11 +1175,15 @@ export default function App() {
             alert(`Группа "${gName}" успешно создана!`);
         } catch (err) {
             console.error(err);
+            alert(err instanceof Error ? err.message : 'Не удалось создать группу');
+        } finally {
+            setIsCreatingGroup(false);
         }
     };
 
     const handleAcceptFriend = async (reqId: string) => {
-        if (!currentUser) return;
+        if (!currentUser || pendingFriendRequestId) return;
+        setPendingFriendRequestId(reqId);
         try {
             const { error } = await supabaseClient.rpc('respond_friend_request', { request_id: reqId, accept_request: true });
             if (error) throw error;
@@ -943,11 +1191,15 @@ export default function App() {
             loadChatsAndFriends(currentUser.id);
         } catch (e) {
             console.error(e);
+            alert('Не удалось принять запрос');
+        } finally {
+            setPendingFriendRequestId(null);
         }
     };
 
     const handleRejectFriend = async (reqId: string) => {
-        if (!currentUser) return;
+        if (!currentUser || pendingFriendRequestId) return;
+        setPendingFriendRequestId(reqId);
         try {
             const { error } = await supabaseClient.rpc('respond_friend_request', { request_id: reqId, accept_request: false });
             if (error) throw error;
@@ -955,6 +1207,9 @@ export default function App() {
             loadChatsAndFriends(currentUser.id);
         } catch (e) {
             console.error(e);
+            alert('Не удалось отклонить запрос');
+        } finally {
+            setPendingFriendRequestId(null);
         }
     };
 
@@ -1052,7 +1307,18 @@ export default function App() {
     // Bootstrap initialization
     useEffect(() => {
         const bootstrap = async () => {
+            if (bootstrapRunningRef.current) return;
+            bootstrapRunningRef.current = true;
+            setStartupState('loading');
+            setLoadingText('Проверяем сессию…');
+
             try {
+                if (!navigator.onLine) {
+                    setStartupState('offline');
+                    setLoadingText('Для безопасной проверки сессии требуется интернет-соединение.');
+                    return;
+                }
+
                 // Try reading cache for instant UI
                 const cachedUsers = localStorage.getItem('synd_cached_users');
                 const cachedGroups = localStorage.getItem('synd_cached_groups');
@@ -1063,11 +1329,11 @@ export default function App() {
                 const activeUser = authData || currentUser;
 
                 if (activeUser) {
-                    setIsAuth(true);
-
                     // Check if local keys exist before registering this device as trusted.
+                    setLoadingText('Загружаем ключи…');
                     const keyStatus = await checkCryptoKeys(activeUser.id);
                     if (keyStatus.ready) {
+                        setLoadingText('Подключаемся…');
                         await registerDevice(activeUser.id);
                         listenToSyncRequests(activeUser.id);
                         // Check local PIN code status
@@ -1085,19 +1351,28 @@ export default function App() {
 
                         const savedWhisper = localStorage.getItem('synd_whisper_model') || 'Xenova/whisper-tiny';
                         worker.postMessage({ type: 'init', model: savedWhisper });
+                        setIsAuth(true);
                     } else {
                         // New device! Prompt sync request popup
+                        setIsAuth(true);
                         await syncDeviceKeys(activeUser.id);
                     }
                 } else {
-                    setLoadingText('Вам необходимо запустить приложение из Telegram или получить токен авторизации.');
+                    setStartupState('error');
+                    setLoadingText('Войдите удобным способом, чтобы продолжить.');
                 }
             } catch (err: any) {
                 console.error(err);
-                setLoadingText('Ошибка инициализации: ' + err.message);
+                setStartupState(navigator.onLine ? 'error' : 'offline');
+                setLoadingText(navigator.onLine
+                    ? 'Не удалось завершить запуск. Проверьте соединение и попробуйте ещё раз.'
+                    : 'Для безопасной проверки сессии требуется интернет-соединение.');
+            } finally {
+                bootstrapRunningRef.current = false;
             }
         };
 
+        retryBootstrapRef.current = bootstrap;
         bootstrap();
 
         // Load custom themes on boot
@@ -1121,7 +1396,12 @@ export default function App() {
             }
         };
 
+        const handleStartupOnline = () => {
+            void retryBootstrapRef.current();
+        };
+
         document.addEventListener('visibilitychange', handleBackgroundAutoLock);
+        window.addEventListener('online', handleStartupOnline);
 
         return () => {
             if (workerRef.current) {
@@ -1136,6 +1416,7 @@ export default function App() {
             appChannelsRef.current = [];
             mq.removeEventListener('change', checkStandalone);
             document.removeEventListener('visibilitychange', handleBackgroundAutoLock);
+            window.removeEventListener('online', handleStartupOnline);
         };
     }, []);
 
@@ -1161,11 +1442,13 @@ export default function App() {
     }
 
     if (!isAuth) {
-        const isError = loadingText.includes('Вам необходимо') || loadingText.includes('Ошибка');
+        const showLogin = loadingText.startsWith('Войдите');
         return (
             <LoginScreen
-                isError={isError}
+                isError={showLogin}
                 loadingText={loadingText}
+                startupState={startupState}
+                onRetryStartup={() => void retryBootstrapRef.current()}
                 deferredPrompt={deferredPrompt}
                 setDeferredPrompt={setDeferredPrompt}
                 telegramMiniAppContext={telegramMiniAppContext}
@@ -1421,17 +1704,24 @@ export default function App() {
                             const filteredRequests = friendRequests.filter((req) =>
                                 req.user.first_name.toLowerCase().includes(chatSearch.toLowerCase())
                             );
-                            const filteredGroupChats = groupChats.filter((g) =>
-                                g.name.toLowerCase().includes(chatSearch.toLowerCase())
-                            );
-                            const filteredFriends = friends.filter((f) =>
-                                f.first_name.toLowerCase().includes(chatSearch.toLowerCase())
-                            );
+                            const chatPriority = (chatId?: string) => {
+                                if (!chatId) return 2;
+                                if (pinnedChatIds.has(chatId)) return 0;
+                                if (unreadChatIds.has(chatId)) return 1;
+                                return 2;
+                            };
+                            const filteredGroupChats = groupChats
+                                .filter((g) => g.name.toLowerCase().includes(chatSearch.toLowerCase()))
+                                .sort((a, b) => chatPriority(a.id) - chatPriority(b.id));
+                            const filteredFriends = friends
+                                .filter((f) => f.first_name.toLowerCase().includes(chatSearch.toLowerCase()))
+                                .sort((a, b) => chatPriority(privateChatByFriendId[a.tg_id]) - chatPriority(privateChatByFriendId[b.tg_id]));
 
                             const hasRequests = filteredRequests.length > 0;
                             const hasGroups = filteredGroupChats.length > 0;
                             const hasFriends = filteredFriends.length > 0;
                             const isSearching = chatSearch.trim() !== '';
+                            const savedDraft = (Object.values(draftPreviews) as DraftPreview[]).find((draft) => draft.chatType === 'saved');
 
                             return (
                                 <>
@@ -1457,17 +1747,21 @@ export default function App() {
                                                 <div className="flex gap-1.5">
                                                     <button
                                                         onClick={() => handleAcceptFriend(req.id)}
-                                                        className="w-8.5 h-8.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition active:scale-95 cursor-pointer shadow-md"
-                                                        title="Принять"
+                                                        disabled={pendingFriendRequestId !== null}
+                                                        className="w-8.5 h-8.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition active:scale-95 cursor-pointer shadow-md disabled:opacity-60 disabled:cursor-wait disabled:active:scale-100"
+                                                        title={pendingFriendRequestId === req.id ? 'Принимаем…' : 'Принять'}
+                                                        aria-label={pendingFriendRequestId === req.id ? 'Принимаем запрос' : 'Принять запрос'}
                                                     >
-                                                        <UserCheck className="w-4.5 h-4.5" />
+                                                        {pendingFriendRequestId === req.id ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> : <UserCheck className="w-4.5 h-4.5" />}
                                                     </button>
                                                     <button
                                                         onClick={() => handleRejectFriend(req.id)}
-                                                        className="w-8.5 h-8.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-rose-500 flex items-center justify-center transition active:scale-95 cursor-pointer"
-                                                        title="Отклонить"
+                                                        disabled={pendingFriendRequestId !== null}
+                                                        className="w-8.5 h-8.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-rose-500 flex items-center justify-center transition active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-wait disabled:active:scale-100"
+                                                        title={pendingFriendRequestId === req.id ? 'Отклоняем…' : 'Отклонить'}
+                                                        aria-label={pendingFriendRequestId === req.id ? 'Отклоняем запрос' : 'Отклонить запрос'}
                                                     >
-                                                        <UserMinus className="w-4.5 h-4.5" />
+                                                        {pendingFriendRequestId === req.id ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> : <UserMinus className="w-4.5 h-4.5" />}
                                                     </button>
                                                 </div>
                                             </div>
@@ -1488,8 +1782,8 @@ export default function App() {
                                                         Избранное
                                                         <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                                                     </div>
-                                                    <div className="text-[11px] text-slate-400 mt-0.5 truncate">
-                                                        Личный архив заметок, файлов и аудио
+                                                    <div className={`text-[11px] mt-0.5 truncate ${savedDraft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                                                        {savedDraft ? `Черновик: ${formatDraftPreview(savedDraft.text)}` : 'Личный архив заметок, файлов и аудио'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1502,7 +1796,9 @@ export default function App() {
 
                                     {/* 3. Group Chats list */}
                                     {(activeTab === 'all' || activeTab === 'groups') &&
-                                        filteredGroupChats.map((g) => (
+                                        filteredGroupChats.map((g) => {
+                                            const draft = draftPreviews[g.id];
+                                            return (
                                             <div
                                                 key={g.id}
                                                 onClick={() => handleOpenGroupChat(g)}
@@ -1517,21 +1813,40 @@ export default function App() {
                                                             {g.name}
                                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 mt-0.5 truncate flex items-center gap-1">
-                                                            <Users className="w-3 h-3 text-slate-500" /> Групповой защищенный канал
+                                                        <div className={`text-[11px] mt-0.5 truncate flex items-center gap-1 ${draft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                                                            {draft ? <>Черновик: {formatDraftPreview(draft.text)}</> : <><Users className="w-3 h-3 text-slate-500" /> Групповой защищенный канал</>}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 text-slate-500 group-hover:text-primary transition">
+                                                <div className="flex items-center gap-2 text-slate-500 group-hover:text-primary transition">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => { event.stopPropagation(); toggleChatPin(g.id); }}
+                                                        className={`p-1 rounded-md transition ${pinnedChatIds.has(g.id) ? 'text-amber-400 bg-amber-400/10' : 'text-slate-600 hover:text-slate-300'}`}
+                                                        aria-label={pinnedChatIds.has(g.id) ? 'Открепить чат' : 'Закрепить чат'}
+                                                        title={pinnedChatIds.has(g.id) ? 'Открепить чат' : 'Закрепить чат'}
+                                                    >
+                                                        <Pin className={`w-3.5 h-3.5 ${pinnedChatIds.has(g.id) ? 'fill-current' : ''}`} />
+                                                    </button>
+                                                    {unreadChatIds.has(g.id) && (
+                                                        <span
+                                                            className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(34,211,238,0.65)] flex-shrink-0"
+                                                            role="status"
+                                                            aria-label="Есть новые сообщения"
+                                                        />
+                                                    )}
                                                     <span className="text-[10px] font-mono font-bold tracking-widest mr-1 text-slate-600">SECURE</span>
                                                     <ChevronRight className="w-4 h-4" />
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
 
                                     {/* 4. Friends list (PM) */}
                                     {(activeTab === 'all' || activeTab === 'friends') &&
-                                        filteredFriends.map((f) => (
+                                        filteredFriends.map((f) => {
+                                            const draft = findPrivateDraft(f.tg_id);
+                                            return (
                                             <div
                                                 key={f.tg_id}
                                                 onClick={() => handleOpenPrivateChat(f)}
@@ -1546,17 +1861,36 @@ export default function App() {
                                                             {f.first_name}
                                                             <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 mt-0.5 truncate flex items-center gap-1">
-                                                            <Lock className="w-3 h-3 text-slate-500" /> Личный зашифрованный чат
+                                                        <div className={`text-[11px] mt-0.5 truncate flex items-center gap-1 ${draft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                                                            {draft ? <>Черновик: {formatDraftPreview(draft.text)}</> : <><Lock className="w-3 h-3 text-slate-500" /> Личный зашифрованный чат</>}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 text-slate-500 group-hover:text-primary transition">
+                                                <div className="flex items-center gap-2 text-slate-500 group-hover:text-primary transition">
+                                                    {privateChatByFriendId[f.tg_id] && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => { event.stopPropagation(); toggleChatPin(privateChatByFriendId[f.tg_id]); }}
+                                                            className={`p-1 rounded-md transition ${pinnedChatIds.has(privateChatByFriendId[f.tg_id]) ? 'text-amber-400 bg-amber-400/10' : 'text-slate-600 hover:text-slate-300'}`}
+                                                            aria-label={pinnedChatIds.has(privateChatByFriendId[f.tg_id]) ? 'Открепить чат' : 'Закрепить чат'}
+                                                            title={pinnedChatIds.has(privateChatByFriendId[f.tg_id]) ? 'Открепить чат' : 'Закрепить чат'}
+                                                        >
+                                                            <Pin className={`w-3.5 h-3.5 ${pinnedChatIds.has(privateChatByFriendId[f.tg_id]) ? 'fill-current' : ''}`} />
+                                                        </button>
+                                                    )}
+                                                    {privateChatByFriendId[f.tg_id] && unreadChatIds.has(privateChatByFriendId[f.tg_id]) && (
+                                                        <span
+                                                            className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(34,211,238,0.65)] flex-shrink-0"
+                                                            role="status"
+                                                            aria-label="Есть новые сообщения"
+                                                        />
+                                                    )}
                                                     <span className="text-[10px] font-mono font-bold tracking-widest mr-1 text-slate-600">PM</span>
                                                     <ChevronRight className="w-4 h-4" />
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
 
                                     {/* Empty states for filters */}
                                     {activeTab === 'groups' && !hasGroups && (
@@ -1664,8 +1998,9 @@ export default function App() {
                 <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex flex-col justify-center p-4 sm:p-6 animate-fade-in overflow-y-auto">
                     <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-2xl flex flex-col gap-4 max-w-md w-full mx-auto relative max-h-[90vh] overflow-y-auto scrollbar-thin my-auto">
                         <button
-                            onClick={() => setShowCreateGroup(false)}
-                            className="absolute top-4 right-4 text-slate-500 hover:text-slate-300"
+                            onClick={() => !isCreatingGroup && setShowCreateGroup(false)}
+                            disabled={isCreatingGroup}
+                            className="absolute top-4 right-4 disabled:opacity-40 disabled:cursor-wait text-slate-500 hover:text-slate-300"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -1675,13 +2010,16 @@ export default function App() {
                             placeholder="Название группы..."
                             value={groupNameInput}
                             onChange={(e) => setGroupNameInput(e.target.value)}
+                            disabled={isCreatingGroup}
                             className="w-full bg-slate-950 border border-slate-900 text-slate-200 rounded-xl px-4 py-3 outline-none focus:border-primary"
                         />
                         <button
                             onClick={handleCreateGroup}
-                            className="bg-primary hover:bg-primary-hover text-white font-semibold py-3.5 rounded-xl transition"
+                            disabled={isCreatingGroup || !groupNameInput.trim()}
+                            className="bg-primary hover:bg-primary-hover text-white font-semibold py-3.5 rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-primary"
                         >
-                            Создать
+                            {isCreatingGroup && <Loader2 className="w-5 h-5 animate-spin" />}
+                            {isCreatingGroup ? 'Создаём…' : 'Создать'}
                         </button>
                     </div>
                 </div>
@@ -1694,8 +2032,9 @@ export default function App() {
                         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
 
                         <button
-                            onClick={() => setShowAddFriend(false)}
-                            className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition-colors bg-slate-950/50 p-1.5 rounded-full"
+                            onClick={() => !searchSpinner && setShowAddFriend(false)}
+                            disabled={searchSpinner}
+                            className="absolute top-4 right-4 text-slate-500 disabled:opacity-40 disabled:cursor-wait hover:text-slate-300 transition-colors bg-slate-950/50 p-1.5 rounded-full"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -1734,6 +2073,7 @@ export default function App() {
                                 placeholder="000000000"
                                 value={friendIdInput}
                                 onChange={(e) => setFriendIdInput(e.target.value)}
+                                disabled={searchSpinner}
                                 className="w-full bg-slate-950/50 border border-slate-800 focus:border-primary/50 text-slate-100 rounded-2xl px-4 py-3 sm:px-5 sm:py-4 font-mono font-bold text-base sm:text-lg outline-none transition-colors"
                             />
                         </div>
@@ -1743,7 +2083,8 @@ export default function App() {
                             disabled={searchSpinner}
                             className="w-full bg-primary hover:bg-primary-hover active:bg-primary/90 text-white font-bold font-mono tracking-wide py-3 sm:py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] mt-1 shadow-lg shadow-primary/20 disabled:opacity-70 disabled:active:scale-100"
                         >
-                            {searchSpinner ? <Loader2 className="w-5 h-5 animate-spin" /> : 'ОТПРАВИТЬ ЗАПРОС'}
+                            {searchSpinner && <Loader2 className="w-5 h-5 animate-spin" />}
+                            {searchSpinner ? 'ОТПРАВЛЯЕМ…' : 'ОТПРАВИТЬ ЗАПРОС'}
                         </button>
                     </div>
                 </div>

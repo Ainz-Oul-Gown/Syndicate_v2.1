@@ -25,8 +25,10 @@ import {
   History,
   Calendar,
   AlertTriangle,
+  Pin,
 } from 'lucide-react';
 import * as idbKeyval from 'idb-keyval';
+import { decryptChatDraft, emitDraftChanged, encryptChatDraft, getDraftStorageKey, type EncryptedChatDraft } from '../lib/drafts';
 import { supabaseClient } from '../lib/supabase';
 import {
   encryptText,
@@ -40,6 +42,8 @@ import { Chat, DecryptedMessage, Message, User, Currency, Debt, ReplyData } from
 import VoicePlayer from './VoicePlayer';
 import DeepSearch from './DeepSearch';
 import { getCachedEmbeddingPipeline } from '../lib/ai';
+import { isOnline, NETWORK_STATE_EVENT, type NetworkStateDetail } from '../lib/network';
+import { notify } from '../lib/notifications';
 
 interface ChatViewProps {
   chat: Chat;
@@ -54,6 +58,8 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [chatKey, setChatKey] = useState<CryptoKey | null>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftTextRef = useRef('');
 
   // Pagination & Loading states
   const [renderLimit, setRenderLimit] = useState(30);
@@ -65,6 +71,36 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
   // Nav, modals and screens
   const [activeModal, setActiveModal] = useState<'none' | 'info' | 'search' | 'debts' | 'add-debt' | 'invite-friend'>('none');
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [online, setOnline] = useState(() => isOnline());
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
+
+  const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(pinnedMessagesStorageKey) || '[]');
+      setPinnedMessageIds(new Set(Array.isArray(stored) ? stored.filter((id) => typeof id === 'string') : []));
+    } catch {
+      setPinnedMessageIds(new Set());
+    }
+  }, [pinnedMessagesStorageKey]);
+
+  const toggleMessagePin = (messageId: string) => {
+    hapticImpact('selection');
+    setPinnedMessageIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageId)) next.delete(messageId); else next.add(messageId);
+      localStorage.setItem(pinnedMessagesStorageKey, JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const scrollToPinnedMessage = () => {
+    const pinned = messages.findLast?.((message) => pinnedMessageIds.has(message.id))
+      || [...messages].reverse().find((message) => pinnedMessageIds.has(message.id));
+    if (pinned) handleScrollToMessage(pinned.id);
+  };
 
   // Reply states
   const [replyTo, setReplyTo] = useState<ReplyData | null>(null);
@@ -122,6 +158,65 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewportShellRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleNetworkState = (event: Event) => {
+      const detail = (event as CustomEvent<NetworkStateDetail>).detail;
+      if (typeof detail?.online === 'boolean') setOnline(detail.online);
+    };
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+
+    window.addEventListener(NETWORK_STATE_EVENT, handleNetworkState);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setOnline(isOnline());
+
+    return () => {
+      window.removeEventListener(NETWORK_STATE_EVENT, handleNetworkState);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Keep the chat inside the actually visible mobile viewport. This prevents the
+  // software keyboard from covering the composer in browser, standalone PWA and
+  // Android WebView/APK wrappers. Message scrolling behavior is intentionally untouched.
+  useEffect(() => {
+    const shell = viewportShellRef.current;
+    if (!shell) return;
+
+    const viewport = window.visualViewport;
+    let frame = 0;
+
+    const syncViewport = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const visibleHeight = Math.round(viewport?.height ?? window.innerHeight);
+        const offsetTop = Math.round(viewport?.offsetTop ?? 0);
+        const keyboardOpen = visibleHeight < window.innerHeight - 120;
+
+        shell.style.setProperty('--chat-visible-height', `${visibleHeight}px`);
+        shell.style.setProperty('--chat-viewport-top', `${offsetTop}px`);
+        shell.dataset.keyboardOpen = keyboardOpen ? 'true' : 'false';
+      });
+    };
+
+    syncViewport();
+    viewport?.addEventListener('resize', syncViewport);
+    viewport?.addEventListener('scroll', syncViewport);
+    window.addEventListener('resize', syncViewport);
+    window.addEventListener('orientationchange', syncViewport);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport?.removeEventListener('resize', syncViewport);
+      viewport?.removeEventListener('scroll', syncViewport);
+      window.removeEventListener('resize', syncViewport);
+      window.removeEventListener('orientationchange', syncViewport);
+    };
+  }, []);
 
   // Load chat symmetric key and fingerprint
   const loadChatKeys = async () => {
@@ -256,6 +351,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
       isError: decrypted.isError,
       voiceData,
       inviteData,
+      deliveryStatus: isMine ? 'sent' : undefined,
     };
   };
 
@@ -357,34 +453,53 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     })();
   };
 
+  const removeMessageLocally = async (messageId: string) => {
+    setPinnedMessageIds((current) => {
+      if (!current.has(messageId)) return current;
+      const next = new Set(current);
+      next.delete(messageId);
+      localStorage.setItem(pinnedMessagesStorageKey, JSON.stringify([...next]));
+      return next;
+    });
+    setMessages((prev) => {
+      const removed = prev.find((item) => item.id === messageId);
+      if (removed?.voiceData?.localUrl) URL.revokeObjectURL(removed.voiceData.localUrl);
+      return prev.filter((item) => item.id !== messageId);
+    });
+
+    const cacheKey = `chat_hist_${chat.id}`;
+    const cached = await idbKeyval.get<{ updated_at: number; history: Message[] }>(cacheKey);
+    if (cached?.history.some((item) => item.id === messageId)) {
+      await idbKeyval.set(cacheKey, {
+        ...cached,
+        updated_at: Date.now(),
+        history: cached.history.filter((item) => item.id !== messageId),
+      });
+    }
+  };
+
   const handleDeleteMessage = async (message: DecryptedMessage) => {
     if (!message.isMine || message.deliveryStatus === 'sending') return;
     if (!confirm('Удалить сообщение для всех участников?')) return;
 
     if (message.id.startsWith('pending-')) {
-      if (message.voiceData?.localUrl) URL.revokeObjectURL(message.voiceData.localUrl);
-      setMessages((prev) => prev.filter((item) => item.id !== message.id));
+      await removeMessageLocally(message.id);
       return;
     }
 
     try {
-      const { error } = await supabaseClient.rpc('delete_own_message', { target_message_id: message.id });
+      const { data: deleted, error } = await supabaseClient.rpc('delete_own_message', { target_message_id: message.id });
       if (error) throw error;
-      setMessages((prev) => prev.filter((item) => item.id !== message.id));
-
-      const cacheKey = `chat_hist_${chat.id}`;
-      const cached = await idbKeyval.get<{ updated_at: number; history: Message[] }>(cacheKey);
-      if (cached?.history) {
-        await idbKeyval.set(cacheKey, {
-          ...cached,
-          history: cached.history.filter((item) => item.id !== message.id),
-        });
+      if (deleted !== true) {
+        throw new Error('The server did not confirm message deletion');
       }
+
+      await removeMessageLocally(message.id);
       await supabaseClient.functions.invoke('storage-cleanup', { body: {} });
       hapticImpact('warning');
     } catch (error) {
       console.error('Failed to delete message', error);
-      alert('Не удалось удалить сообщение. Попробуйте ещё раз.');
+      alert('Не удалось удалить сообщение. Оно могло быть уже удалено или у вас нет прав.');
     }
   };
 
@@ -406,43 +521,40 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         setIsLoadingChat(false);
       }
 
-      // 2. Fetch new messages from Supabase in background
-      const lastMsgDate = cached.history.length > 0 ? cached.history[cached.history.length - 1].created_at : null;
-      let query = supabaseClient
+      // 2. Reconcile the latest server window with the local cache. Fetching a complete
+      // window (instead of only newer rows) also removes messages deleted on another device.
+      const { data: serverRows, error } = await supabaseClient
         .from('messages')
         .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at')
         .eq('chat_id', chat.id)
-        .order('created_at', { ascending: lastMsgDate ? true : false })
-        .limit(lastMsgDate ? 500 : 200);
+        .order('created_at', { ascending: false })
+        .limit(500);
 
-      if (lastMsgDate) {
-        query = query.gt('created_at', lastMsgDate);
-      }
-
-      const { data: newMsgs, error } = await query;
       if (error) throw error;
 
-      if (newMsgs && newMsgs.length > 0) {
-        const orderedNewMsgs = lastMsgDate ? newMsgs : [...newMsgs].reverse();
-        const decryptedNew = await Promise.all(orderedNewMsgs.map((msg: Message) => parseMessage(msg, key)));
+      const serverHistory = [...(serverRows ?? [])].reverse() as Message[];
+      const serverIds = new Set(serverHistory.map((message) => message.id));
+      const oldestServerTime = serverHistory[0]?.created_at
+        ? new Date(serverHistory[0].created_at).getTime()
+        : Number.POSITIVE_INFINITY;
 
-        // Merge, save and update
-        const mergedHistory = [...cached.history, ...orderedNewMsgs].slice(-500);
-        await idbKeyval.set(`chat_hist_${chat.id}`, {
-          updated_at: Date.now(),
-          history: mergedHistory,
-        });
+      // Keep cached rows older than the fetched window for pagination, but trust the server
+      // for every row inside the reconciled window.
+      const olderCached = (cached.history as Message[]).filter((message) => (
+        new Date(message.created_at).getTime() < oldestServerTime && !serverIds.has(message.id)
+      ));
+      const reconciledHistory = [...olderCached, ...serverHistory].slice(-500);
+      const reconciledDecrypted = await Promise.all(reconciledHistory.map((msg) => parseMessage(msg, key)));
 
-        const mergedDecrypted = [...finalMessages, ...decryptedNew];
-        setMessages(mergedDecrypted);
-        scheduleLegacyVoiceMigration(mergedDecrypted, key);
-        const oldestLoaded = mergedHistory[0]?.created_at ?? null;
-        setOldestServerCursor(oldestLoaded);
-        setHasMoreInHistory(!lastMsgDate && orderedNewMsgs.length === 200);
-      } else if (cached.history.length > 0) {
-        setOldestServerCursor(cached.history[0]?.created_at ?? null);
-        setHasMoreInHistory(cached.history.length >= 200);
-      }
+      await idbKeyval.set(`chat_hist_${chat.id}`, {
+        updated_at: Date.now(),
+        history: reconciledHistory,
+      });
+      finalMessages = reconciledDecrypted;
+      setMessages(reconciledDecrypted);
+      scheduleLegacyVoiceMigration(reconciledDecrypted, key);
+      setOldestServerCursor(reconciledHistory[0]?.created_at ?? null);
+      setHasMoreInHistory(serverHistory.length === 500 || olderCached.length > 0);
     } catch (e) {
       console.error(e);
     } finally {
@@ -560,6 +672,14 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
           { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${chat.id}` },
           (payload: any) => void applyRealtimeMessage(payload.new as Message)
         )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'messages' },
+          (payload: any) => {
+            const deletedId = payload.old?.id as string | undefined;
+            if (deletedId) void removeMessageLocally(deletedId);
+          }
+        )
         .subscribe();
 
       return () => {
@@ -569,17 +689,77 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     }
   }, [chatKey, chat.id]);
 
-  // Dynamic textarea sizing
+  const draftStorageKey = getDraftStorageKey(currentUser.id, chat.id);
+
+  const persistDraft = (text: string) => {
+    draftTextRef.current = text;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(async () => {
+      if (!chatKey) return;
+      try {
+        if (!draftTextRef.current) {
+          await idbKeyval.del(draftStorageKey);
+          emitDraftChanged({ userId: currentUser.id, chat, text: '', updatedAt: Date.now() });
+          return;
+        }
+        await idbKeyval.set(draftStorageKey, await encryptChatDraft(draftTextRef.current, chatKey, chat));
+        emitDraftChanged({ userId: currentUser.id, chat, text: draftTextRef.current, updatedAt: Date.now() });
+      } catch (error) {
+        console.warn('Draft save failed', error);
+      }
+    }, 250);
+  };
+
+  useEffect(() => {
+    if (!chatKey) return;
+    let disposed = false;
+
+    void (async () => {
+      try {
+        const encryptedDraft = await idbKeyval.get<EncryptedChatDraft>(draftStorageKey);
+        if (!encryptedDraft || disposed) return;
+        const restored = await decryptChatDraft(encryptedDraft, chatKey);
+        if (!disposed && restored) {
+          draftTextRef.current = restored;
+          setInputText(restored);
+          requestAnimationFrame(() => {
+            if (!inputRef.current) return;
+            inputRef.current.style.height = '42px';
+            inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
+          });
+        }
+      } catch (error) {
+        console.warn('Draft restore failed', error);
+        await idbKeyval.del(draftStorageKey);
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      if (draftTextRef.current) {
+        void encryptChatDraft(draftTextRef.current, chatKey, chat)
+          .then(async (draft) => {
+            await idbKeyval.set(draftStorageKey, draft);
+            emitDraftChanged({ userId: currentUser.id, chat, text: draftTextRef.current, updatedAt: draft.updatedAt });
+          })
+          .catch((error) => console.warn('Draft flush failed', error));
+      }
+    };
+  }, [chatKey, draftStorageKey]);
+
+  // Dynamic textarea sizing and encrypted per-chat draft persistence
   const handleInputChange = (text: string) => {
     setInputText(text);
+    persistDraft(text);
     if (inputRef.current) {
       inputRef.current.style.height = '42px';
       inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
     }
   };
 
-  const sendMessagePayload = async (textToSend: string, reply: ReplyData | null, tempId?: string) => {
-    if (!chatKey) return;
+  const sendMessagePayload = async (textToSend: string, reply: ReplyData | null, tempId?: string): Promise<boolean> => {
+    if (!chatKey) return false;
 
     const optimisticId = tempId ?? `pending-${crypto.randomUUID()}`;
     const optimisticMessage: DecryptedMessage = {
@@ -646,11 +826,13 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
       const history = [...(cached?.history ?? []).filter((message) => message.id !== inserted.id), inserted as Message].slice(-500);
       await idbKeyval.set(cacheKey, { updated_at: Date.now(), history });
       hapticImpact('light');
+      return true;
     } catch (error) {
       console.error(error);
       setMessages((prev) => prev.map((message) => message.id === optimisticId
         ? { ...message, deliveryStatus: 'failed' as const }
         : message));
+      return false;
     }
   };
 
@@ -663,17 +845,56 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     setInputText('');
     setReplyTo(null);
     if (inputRef.current) inputRef.current.style.height = '42px';
-    await sendMessagePayload(textToSend, reply);
+    const sent = await sendMessagePayload(textToSend, reply);
+    if (sent) {
+      draftTextRef.current = '';
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      await idbKeyval.del(draftStorageKey);
+      emitDraftChanged({ userId: currentUser.id, chat, text: '', updatedAt: Date.now() });
+    }
   };
 
-  const retryMessage = async (message: DecryptedMessage) => {
-    if (!message.retryPayload || message.deliveryStatus !== 'failed') return;
+  const retryMessage = async (message: DecryptedMessage): Promise<boolean> => {
+    if (!message.retryPayload || message.deliveryStatus !== 'failed') return false;
     if (message.retryPayload.kind === 'voice') {
-      await uploadVoiceNote(message.retryPayload.blob, message.retryPayload.waveform, message.id, message.retryPayload.localUrl);
-      return;
+      return uploadVoiceNote(
+        message.retryPayload.blob,
+        message.retryPayload.waveform,
+        message.id,
+        message.retryPayload.localUrl,
+        message.retryPayload.reply ?? null,
+      );
     }
-    await sendMessagePayload(message.retryPayload.text, message.retryPayload.reply ?? null, message.id);
+    return sendMessagePayload(message.retryPayload.text, message.retryPayload.reply ?? null, message.id);
   };
+
+  const retryAllFailedMessages = async () => {
+    if (isRetryingFailed || !online) return;
+    const failed = messages.filter((message) => message.deliveryStatus === 'failed' && message.retryPayload);
+    if (failed.length === 0) return;
+
+    setIsRetryingFailed(true);
+    let sentCount = 0;
+    try {
+      // Sequential retries prevent duplicate uploads and reduce pressure on a restored mobile connection.
+      for (const message of failed) {
+        if (!isOnline()) break;
+        const sent = await retryMessage(message);
+        if (sent) sentCount += 1;
+      }
+
+      if (sentCount === failed.length) {
+        notify(`Отправлено сообщений: ${sentCount}.`, 'success');
+      } else if (sentCount > 0) {
+        notify(`Отправлено ${sentCount} из ${failed.length}. Остальные можно повторить позже.`, 'warning');
+      } else if (isOnline()) {
+        notify('Не удалось отправить сообщения. Попробуйте ещё раз.', 'error');
+      }
+    } finally {
+      setIsRetryingFailed(false);
+    }
+  };
+
 
   // Scrolling indicators
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -806,11 +1027,11 @@ hapticImpact("medium");
     }
   };
 
-  const uploadVoiceNote = async (audioBlob: Blob, waveformStr: string, tempId?: string, existingLocalUrl?: string) => {
-    if (!chatKey) return;
+  const uploadVoiceNote = async (audioBlob: Blob, waveformStr: string, tempId?: string, existingLocalUrl?: string, replyOverride?: ReplyData | null): Promise<boolean> => {
+    if (!chatKey) return false;
     const optimisticId = tempId ?? `pending-voice-${crypto.randomUUID()}`;
     const localUrl = existingLocalUrl ?? URL.createObjectURL(audioBlob);
-    const reply = replyTo;
+    const reply = replyOverride !== undefined ? replyOverride : replyTo;
     const optimisticVoice: DecryptedMessage = {
       id: optimisticId,
       sender_id: currentUser.id,
@@ -907,6 +1128,7 @@ hapticImpact("medium");
       if (isAutoWhisperOn) {
         handleVoiceTranslation(fileName, insertedMsg.id, waveformStr);
       }
+      return true;
     } catch (err: any) {
       console.error('Voice message send failed', err);
       if (storageUploaded) {
@@ -920,6 +1142,7 @@ hapticImpact("medium");
         ? { ...m, deliveryStatus: 'failed' as const }
         : m));
       hapticImpact('error');
+      return false;
     }
   };
 
@@ -1537,9 +1760,10 @@ hapticImpact("selection");
   };
 
   const isGroup = chat.type === 'group';
+  const failedMessageCount = messages.filter((message) => message.deliveryStatus === 'failed' && message.retryPayload).length;
 
   return (
-    <div className="flex-1 min-h-0 w-full flex flex-col bg-slate-950 relative select-none animate-fade-in text-slate-100">
+    <div ref={viewportShellRef} className="chat-viewport-shell flex-1 min-h-0 w-full flex flex-col bg-slate-950 relative select-none animate-fade-in text-slate-100">
       {/* Top Header info */}
       <div className="flex items-center justify-between border-b border-slate-900 pb-3 p-4 bg-slate-900/40 relative z-10 flex-shrink-0">
         <button
@@ -1625,6 +1849,12 @@ hapticImpact("selection");
                           : 'msg-other bg-slate-900 border border-slate-850 text-slate-100 rounded-[18px] rounded-bl-[4px]'
                       }`}
                     >
+                  {pinnedMessageIds.has(m.id) && (
+                    <div className={`mb-1 flex items-center gap-1 text-[10px] font-semibold ${m.isMine ? 'text-white/70' : 'text-amber-300'}`}>
+                      <Pin className="w-3 h-3 fill-current" /> Закреплено
+                    </div>
+                  )}
+
                   {/* Sender Name in group */}
                   {isGroup && !m.isMine && (
                     <div className="sender-name text-xs font-bold text-primary mb-1">
@@ -1695,17 +1925,36 @@ hapticImpact("selection");
                       m.isMine ? 'text-white/60' : 'text-slate-500'
                     }`}
                   >
-                    {timeStr}
-                    {m.deliveryStatus === 'sending' && ' · отправка…'}
-                    {m.deliveryStatus === 'failed' && ' · не отправлено'}
+                    <span>{timeStr}</span>
+                    {m.deliveryStatus === 'sending' && <span> · отправка…</span>}
+                    {m.deliveryStatus === 'failed' && <span> · не отправлено</span>}
+                    {m.isMine && m.deliveryStatus === 'sent' && (
+                      <span
+                        className="inline-flex items-center ml-1 align-[-2px] text-sky-300"
+                        title="Принято сервером"
+                        aria-label="Сообщение принято сервером"
+                      >
+                        <Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
+                      </span>
+                    )}
                   </span>
                   {m.deliveryStatus === 'failed' && (
                     <button
                       type="button"
                       onClick={() => void retryMessage(m)}
-                      className="mt-1 self-end text-[11px] font-semibold text-rose-200 underline underline-offset-2"
+                      disabled={isRetryingFailed || !online}
+                      className="mt-1 self-end text-[11px] font-semibold text-rose-200 underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
                     >
                       Повторить
+                    </button>
+                  )}
+                  {!m.id.startsWith('pending-') && (
+                    <button
+                      type="button"
+                      onClick={() => toggleMessagePin(m.id)}
+                      className={`mt-1 self-end text-[11px] underline underline-offset-2 ${pinnedMessageIds.has(m.id) ? 'text-amber-300' : 'text-slate-400 hover:text-amber-300'}`}
+                    >
+                      {pinnedMessageIds.has(m.id) ? 'Открепить' : 'Закрепить'}
                     </button>
                   )}
                   {m.isMine && m.deliveryStatus !== 'sending' && (
@@ -1757,6 +2006,23 @@ hapticImpact("selection");
 
       {/* Input controller bar */}
       <div className="chat-input-area flex-shrink-0 flex flex-col bg-slate-900/80 backdrop-blur-xl border-t border-slate-900 px-4 py-2 relative z-10">
+        {failedMessageCount > 0 && online && (
+          <div className="flex items-center justify-between gap-3 mb-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 animate-slide-up" role="status">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-amber-200">Не отправлено: {failedMessageCount}</div>
+              <div className="text-[10px] text-amber-200/60 truncate">Соединение доступно — можно повторить отправку</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void retryAllFailedMessages()}
+              disabled={isRetryingFailed}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-400/15 px-3 py-2 text-[11px] font-bold text-amber-100 transition active:scale-95 disabled:opacity-60"
+            >
+              {isRetryingFailed && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isRetryingFailed ? 'ОТПРАВЛЯЕМ…' : 'ОТПРАВИТЬ ВСЕ'}
+            </button>
+          </div>
+        )}
         {/* Reply Preview */}
         {replyTo && (
           <div className="flex items-center gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-900/60 mb-2 select-none animate-slide-up">

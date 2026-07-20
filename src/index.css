@@ -117,3 +117,346 @@ body {
   background: #334155;
 }
 
+
+/* Non-blocking app notifications: safe for browser, installed PWA and WebView/APK wrappers. */
+.notification-viewport {
+  position: fixed;
+  z-index: 2147483647;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(calc(100vw - 24px), 440px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.notification-card {
+  --notification-accent: #38bdf8;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 32px;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 10px 12px 14px;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid color-mix(in srgb, var(--notification-accent) 42%, #334155);
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.48), inset 3px 0 0 var(--notification-accent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  pointer-events: auto;
+  animation: notification-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow-wrap: anywhere;
+  touch-action: manipulation;
+}
+
+.notification--success { --notification-accent: #34d399; }
+.notification--error { --notification-accent: #fb7185; }
+.notification--warning { --notification-accent: #fbbf24; }
+.notification--info { --notification-accent: #38bdf8; }
+
+.notification-icon {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--notification-accent);
+  flex: none;
+}
+
+.notification-copy { min-width: 0; }
+.notification-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--notification-accent);
+  font: 700 10px/1.2 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.notification-copy p {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.38;
+}
+.notification-close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  margin-top: -5px;
+  color: #94a3b8;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.notification-close:hover,
+.notification-close:focus-visible {
+  color: #f8fafc;
+  background: rgba(148, 163, 184, 0.12);
+  outline: none;
+}
+.notification-close svg { width: 17px; height: 17px; }
+
+@keyframes notification-enter {
+  from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (display-mode: standalone) {
+  .notification-viewport {
+    top: max(14px, env(safe-area-inset-top));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-card { animation: none; }
+}
+
+/* Persistent connectivity state for PWA and future WebView/APK packaging. */
+.network-status {
+  position: fixed;
+  z-index: 2147483646;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(calc(100vw - 24px), 420px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  color: #fef3c7;
+  background: rgba(69, 26, 3, 0.94);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+.network-status > svg { width: 20px; height: 20px; flex: none; color: #fbbf24; }
+.network-status span { display: flex; min-width: 0; flex-direction: column; line-height: 1.2; }
+.network-status strong { font-size: 13px; }
+.network-status small { margin-top: 2px; color: #fde68a; font-size: 11px; }
+
+@media (display-mode: standalone) {
+  .network-status { bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+
+/* User-controlled PWA update prompt. It avoids forced reloads while the user is working. */
+.pwa-update {
+  position: fixed;
+  z-index: 2147483645;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(calc(100vw - 24px), 460px);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 9px 11px 14px;
+  color: #e0f2fe;
+  background: rgba(8, 47, 73, 0.96);
+  border: 1px solid rgba(56, 189, 248, 0.48);
+  border-radius: 16px;
+  box-shadow: 0 16px 44px rgba(2, 6, 23, 0.5);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  animation: notification-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Keep both persistent banners readable if an update is discovered while offline. */
+.network-status + .pwa-update {
+  bottom: max(84px, calc(env(safe-area-inset-bottom) + 84px));
+}
+
+.pwa-update__icon {
+  width: 21px;
+  height: 21px;
+  color: #38bdf8;
+}
+
+.pwa-update__icon--spinning {
+  animation: pwa-update-spin 900ms linear infinite;
+}
+
+.pwa-update__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.pwa-update__copy strong {
+  font-size: 13px;
+}
+
+.pwa-update__copy small {
+  margin-top: 2px;
+  color: #bae6fd;
+  font-size: 11px;
+}
+
+.pwa-update__action {
+  min-height: 36px;
+  padding: 0 13px;
+  color: #082f49;
+  background: #7dd3fc;
+  border: 0;
+  border-radius: 11px;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pwa-update__action:hover,
+.pwa-update__action:focus-visible {
+  background: #bae6fd;
+  outline: none;
+}
+
+.pwa-update__action:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.pwa-update__dismiss {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #bae6fd;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pwa-update__dismiss:hover,
+.pwa-update__dismiss:focus-visible {
+  color: #f0f9ff;
+  background: rgba(186, 230, 253, 0.12);
+  outline: none;
+}
+
+.pwa-update__dismiss:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pwa-update__dismiss svg {
+  width: 17px;
+  height: 17px;
+}
+
+@keyframes pwa-update-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 420px) {
+  .pwa-update {
+    grid-template-columns: 22px minmax(0, 1fr) auto 32px;
+    gap: 8px;
+    padding-left: 12px;
+  }
+
+  .pwa-update__copy small { display: none; }
+  .pwa-update__action { padding-inline: 11px; }
+}
+
+@media (display-mode: standalone) {
+  .pwa-update { bottom: max(14px, env(safe-area-inset-bottom)); }
+  .network-status + .pwa-update {
+    bottom: max(86px, calc(env(safe-area-inset-bottom) + 86px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-update { animation: none; }
+  .pwa-update__icon--spinning { animation-duration: 1.8s; }
+}
+
+/* Stage 26: calm, actionable PWA startup experience */
+.startup-screen {
+  position: relative;
+  z-index: 10;
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(2rem + env(safe-area-inset-top, 0px)) 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  text-align: center;
+}
+
+.startup-icon {
+  width: 4rem;
+  height: 4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 1.25rem;
+  color: var(--primary-color, #0a84ff);
+  background: color-mix(in srgb, var(--primary-color, #0a84ff) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary-color, #0a84ff) 30%, transparent);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--primary-color, #0a84ff) 14%, transparent);
+  margin-bottom: 1.25rem;
+}
+.startup-icon svg { width: 1.8rem; height: 1.8rem; }
+.startup-icon-warning { color: #f59e0b; background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .28); box-shadow: none; }
+.startup-screen h1 { margin: 0; font-size: 1.3rem; font-weight: 750; color: #f8fafc; }
+.startup-screen > p { margin: .65rem 0 0; max-width: 300px; color: #94a3b8; font-size: .9rem; line-height: 1.55; }
+.startup-steps { width: 100%; margin-top: 1.75rem; display: grid; gap: .65rem; }
+.startup-step { display: flex; align-items: center; gap: .75rem; padding: .72rem .8rem; border: 1px solid rgba(51,65,85,.65); border-radius: .9rem; color: #64748b; background: rgba(15,23,42,.55); text-align: left; transition: .2s ease; }
+.startup-step > span { width: 1.6rem; height: 1.6rem; flex: 0 0 auto; display: grid; place-items: center; border-radius: 999px; background: #1e293b; font-size: .72rem; font-weight: 700; }
+.startup-step svg { width: .95rem; height: .95rem; }
+.startup-step small { font-size: .82rem; font-weight: 600; }
+.startup-step.active { color: #e2e8f0; border-color: color-mix(in srgb, var(--primary-color, #0a84ff) 42%, transparent); background: color-mix(in srgb, var(--primary-color, #0a84ff) 8%, rgba(15,23,42,.7)); }
+.startup-step.active > span { color: white; background: var(--primary-color, #0a84ff); }
+.startup-step.done { color: #86efac; }
+.startup-step.done > span { color: #22c55e; background: rgba(34,197,94,.12); }
+.startup-retry { margin-top: 1.5rem; min-height: 48px; width: 100%; display: flex; align-items: center; justify-content: center; gap: .55rem; border: 0; border-radius: .9rem; color: white; background: var(--primary-color, #0a84ff); font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.startup-retry:active { transform: scale(.985); }
+.startup-retry svg { width: 1rem; height: 1rem; }
+.startup-hint { margin-top: .9rem; max-width: 300px; color: #64748b; font-size: .74rem; line-height: 1.45; }
+@media (prefers-reduced-motion: reduce) { .startup-screen .animate-spin { animation-duration: 1.6s; } }
+
+
+/* Mobile keyboard viewport handling for chat. visualViewport values are written
+   by ChatView so the composer stays visible in browser, standalone PWA and WebView. */
+.chat-viewport-shell {
+  position: fixed;
+  z-index: 20;
+  top: var(--chat-viewport-top, 0px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: var(--chat-visible-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.chat-viewport-shell .chat-input-area {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.chat-viewport-shell[data-keyboard-open='true'] .chat-input-area {
+  padding-bottom: 0.5rem;
+}
+
+.chat-viewport-shell textarea {
+  scroll-margin-bottom: 12px;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .chat-viewport-shell {
+    height: var(--chat-visible-height, -webkit-fill-available);
+  }
+}

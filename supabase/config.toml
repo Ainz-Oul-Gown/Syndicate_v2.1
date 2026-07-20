@@ -53,3 +53,11 @@ verify_jwt = true
 
 [functions.webauthn-remove-credential]
 verify_jwt = true
+[functions.push-register]
+verify_jwt = true
+
+[functions.push-unregister]
+verify_jwt = true
+
+[functions.push-dispatch]
+verify_jwt = false
