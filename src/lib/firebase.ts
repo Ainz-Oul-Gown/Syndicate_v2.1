@@ -24,6 +24,13 @@ if (missingFirebaseVariables.length > 0) {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+console.log('Firebase config', {
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+});
+
 googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
