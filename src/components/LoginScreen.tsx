@@ -659,40 +659,26 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         
         if (options.error) throw new Error(options.error);
 
-        // 2. Start Passkey Registration in browser with smart biometric optimization and robust fallbacks
+        // 2. Start Passkey Registration in browser with biometric lock
+        if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+          const isAvailable = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          if (!isAvailable) {
+            throw new Error('Ваше устройство или браузер не поддерживает встроенную биометрию (отпечаток пальца/FaceID). Пожалуйста, используйте другое устройство или браузер, поддерживающий WebAuthn Platform Authenticators.');
+          }
+        }
+        
         let attResp;
         try {
-          // Attempt 1: Smart adaptation (Require Resident Key and User Verification, remove strict platform attachment to bypass Android Chrome bugs)
           const adaptedOptions = JSON.parse(JSON.stringify(options));
           if (adaptedOptions.authenticatorSelection) {
+            adaptedOptions.authenticatorSelection.authenticatorAttachment = 'platform';
             adaptedOptions.authenticatorSelection.residentKey = 'required';
             adaptedOptions.authenticatorSelection.requireResidentKey = true;
             adaptedOptions.authenticatorSelection.userVerification = 'required';
-            // Remove 'platform' constraint so Chrome displays a friendly native system selector where 
-            // "This Device / Screen Lock" (Fingerprint) is available as the primary secure choice.
-            delete adaptedOptions.authenticatorSelection.authenticatorAttachment;
           }
           attResp = await startRegistration({ optionsJSON: adaptedOptions });
-        } catch (e1: any) {
-          console.warn('Smart WebAuthn registration failed, trying direct platform fallback...', e1);
-          try {
-            // Attempt 2: Direct platform mode (Force system authenticator)
-            const platformOptions = JSON.parse(JSON.stringify(options));
-            if (platformOptions.authenticatorSelection) {
-              platformOptions.authenticatorSelection.authenticatorAttachment = 'platform';
-              platformOptions.authenticatorSelection.residentKey = 'preferred';
-              platformOptions.authenticatorSelection.userVerification = 'preferred';
-            }
-            attResp = await startRegistration({ optionsJSON: platformOptions });
-          } catch (e2: any) {
-            console.warn('Platform WebAuthn registration failed, trying server-side default options...', e2);
-            try {
-              // Attempt 3: Standard options returned from server
-              attResp = await startRegistration({ optionsJSON: options });
-            } catch (e3: any) {
-              throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или графический ключ для разблокировки экрана, а в Chrome включено автозаполнение паролей. Ошибка: ' + e3.message);
-            }
-          }
+        } catch (e: any) {
+          throw new Error('Не удалось зарегистрировать Passkey. Убедитесь, что отпечаток пальца или FaceID настроены на вашем устройстве. (' + e.message + ')');
         }
 
         // 3. Generate Crypto Keys
@@ -787,20 +773,21 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         const options = await optsRes.json();
         if (options.error) throw new Error(options.error);
 
-        // 2. Start Passkey Auth in browser with adaptive user verification to prioritize fingerprint
+        // 2. Start Passkey Auth in browser with biometric lock
+        if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+          const isAvailable = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          if (!isAvailable) {
+            throw new Error('Ваше устройство или браузер не поддерживает встроенную биометрию (отпечаток пальца/FaceID). Пожалуйста, используйте другое устройство или браузер.');
+          }
+        }
+
         let asseResp;
         try {
           const adaptedOptions = JSON.parse(JSON.stringify(options));
-          // Require user verification to immediately invoke the biometric/fingerprint sensor dialog on Android
           adaptedOptions.userVerification = 'required';
           asseResp = await startAuthentication({ optionsJSON: adaptedOptions });
-        } catch (e1: any) {
-          console.warn('Smart WebAuthn authentication failed, trying standard options...', e1);
-          try {
-            asseResp = await startAuthentication({ optionsJSON: options });
-          } catch (e2: any) {
-            throw new Error('Авторизация Passkey отменена или не удалась: ' + e2.message);
-          }
+        } catch (e: any) {
+          throw new Error('Авторизация Passkey отменена или не удалась (требуется биометрия): ' + e.message);
         }
 
         // 3. Verify Auth with Server
