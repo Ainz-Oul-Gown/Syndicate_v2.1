@@ -672,9 +672,9 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
           const adaptedOptions = JSON.parse(JSON.stringify(options));
           if (adaptedOptions.authenticatorSelection) {
             adaptedOptions.authenticatorSelection.authenticatorAttachment = 'platform';
-            adaptedOptions.authenticatorSelection.residentKey = 'required';
-            adaptedOptions.authenticatorSelection.requireResidentKey = true;
-            adaptedOptions.authenticatorSelection.userVerification = 'required';
+            adaptedOptions.authenticatorSelection.residentKey = 'preferred';
+            adaptedOptions.authenticatorSelection.userVerification = 'preferred';
+            delete adaptedOptions.authenticatorSelection.requireResidentKey;
           }
           attResp = await startRegistration({ optionsJSON: adaptedOptions });
         } catch (e: any) {
@@ -784,7 +784,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         let asseResp;
         try {
           const adaptedOptions = JSON.parse(JSON.stringify(options));
-          adaptedOptions.userVerification = 'required';
+          adaptedOptions.userVerification = 'preferred';
           asseResp = await startAuthentication({ optionsJSON: adaptedOptions });
         } catch (e: any) {
           throw new Error('Авторизация Passkey отменена или не удалась (требуется биометрия): ' + e.message);
