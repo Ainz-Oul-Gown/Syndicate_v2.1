@@ -74,7 +74,7 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
   // - rp without explicit id (let browser use current origin)
   // - authenticatorSelection with userVerification and residentKey only
   // - NO authenticatorAttachment
-  const publicKey: PublicKeyCredentialCreationOptions = {
+  const publicKey = {
     challenge: base64urlToBuffer(optionsJSON.challenge),
     rp: { name: optionsJSON.rp.name },
     user: {
@@ -83,23 +83,23 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
       displayName: optionsJSON.user.displayName,
     },
     pubKeyCredParams: optionsJSON.pubKeyCredParams.map(p => ({
-      type: p.type as PublicKeyCredentialType,
+      type: p.type,
       alg: p.alg,
     })),
     timeout: optionsJSON.timeout ?? 60000,
-    attestation: (optionsJSON.attestation as AttestationConveyancePreference) ?? 'none',
+    attestation: optionsJSON.attestation ?? 'none',
     // hints tells the browser which authenticator to prefer.
     // 'client-device' = platform authenticator (fingerprint/FaceID/screen lock).
     // This is the key to getting fingerprint prompt instead of NFC/USB on Android Chrome.
-    hints: ['client-device'] as any,
-  };
+    hints: ['client-device'],
+  } as any;
 
   // Only add authenticatorSelection if present (without authenticatorAttachment)
   if (optionsJSON.authenticatorSelection) {
     const sel = optionsJSON.authenticatorSelection;
     publicKey.authenticatorSelection = {
-      userVerification: (sel.userVerification as UserVerificationRequirement) ?? 'preferred',
-      residentKey: (sel.residentKey as ResidentKeyRequirement) ?? 'preferred',
+      userVerification: sel.userVerification ?? 'preferred',
+      residentKey: sel.residentKey ?? 'preferred',
     };
     // Do NOT set authenticatorAttachment — this causes NFC/USB prompts on Android
   }
@@ -108,12 +108,12 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
   if (optionsJSON.excludeCredentials?.length) {
     publicKey.excludeCredentials = optionsJSON.excludeCredentials.map(cred => ({
       id: base64urlToBuffer(cred.id),
-      type: cred.type as PublicKeyCredentialType,
-      transports: cred.transports as AuthenticatorTransport[],
+      type: cred.type,
+      transports: cred.transports,
     }));
   }
 
-  const credential = await navigator.credentials.create({ publicKey });
+  const credential = await navigator.credentials.create({ publicKey }) as any;
 
   if (!credential) {
     throw new Error('navigator.credentials.create() вернул null');
@@ -125,19 +125,19 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     rawId: bufferToBase64url(credential.rawId),
     type: credential.type,
     response: {
-      attestationObject: bufferToBase64url((credential.response as AuthenticatorAttestationResponse).attestationObject),
+      attestationObject: bufferToBase64url(credential.response.attestationObject),
       clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
-      getAuthenticatorData: (credential.response as AuthenticatorAttestationResponse).getAuthenticatorData
-        ? bufferToBase64url((credential.response as AuthenticatorAttestationResponse).getAuthenticatorData())
+      getAuthenticatorData: typeof credential.response.getAuthenticatorData === 'function'
+        ? bufferToBase64url(credential.response.getAuthenticatorData())
         : undefined,
-      getPublicKey: (credential.response as AuthenticatorAttestationResponse).getPublicKey
-        ? bufferToBase64((credential.response as AuthenticatorAttestationResponse).getPublicKey()!)
+      getPublicKey: typeof credential.response.getPublicKey === 'function'
+        ? bufferToBase64(credential.response.getPublicKey())
         : undefined,
-      getPublicKeyAlgorithm: (credential.response as AuthenticatorAttestationResponse).getPublicKeyAlgorithm
-        ? (credential.response as AuthenticatorAttestationResponse).getPublicKeyAlgorithm()
+      getPublicKeyAlgorithm: typeof credential.response.getPublicKeyAlgorithm === 'function'
+        ? credential.response.getPublicKeyAlgorithm()
         : undefined,
-      getTransports: (credential.response as AuthenticatorAttestationResponse).getTransports
-        ? (credential.response as AuthenticatorAttestationResponse).getTransports()
+      getTransports: typeof credential.response.getTransports === 'function'
+        ? credential.response.getTransports()
         : [],
     },
     authenticatorAttachment: credential.authenticatorAttachment,
@@ -150,14 +150,14 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
 /**
  * Authenticate an existing passkey using the native navigator.credentials.get() API.
  */
-export async function nativeStartAuthentication(optionsJSON: AuthenticationOptionsJSON): Promise<PublicKeyCredentialJSON> {
-  const publicKey: PublicKeyCredentialRequestOptions = {
+export async function nativeStartAuthentication(optionsJSON: AuthenticationOptionsJSON): Promise<any> {
+  const publicKey = {
     challenge: base64urlToBuffer(optionsJSON.challenge),
     timeout: optionsJSON.timeout ?? 60000,
     // hints tells the browser which authenticator to prefer.
     // 'client-device' = platform authenticator (fingerprint/FaceID/screen lock).
-    hints: ['client-device'] as any,
-  };
+    hints: ['client-device'],
+  } as any;
 
   // Only add rpId if present (otherwise browser uses current origin)
   if (optionsJSON.rpId) {
@@ -165,26 +165,26 @@ export async function nativeStartAuthentication(optionsJSON: AuthenticationOptio
   }
 
   if (optionsJSON.userVerification) {
-    publicKey.userVerification = optionsJSON.userVerification as UserVerificationRequirement;
+    publicKey.userVerification = optionsJSON.userVerification;
   }
 
   // Add allowCredentials if present
   if (optionsJSON.allowCredentials?.length) {
     publicKey.allowCredentials = optionsJSON.allowCredentials.map(cred => ({
       id: base64urlToBuffer(cred.id),
-      type: cred.type as PublicKeyCredentialType,
-      transports: cred.transports as AuthenticatorTransport[],
+      type: cred.type,
+      transports: cred.transports,
     }));
   }
 
-  const credential = await navigator.credentials.get({ publicKey });
+  const credential = await navigator.credentials.get({ publicKey }) as any;
 
   if (!credential) {
     throw new Error('navigator.credentials.get() вернул null');
   }
 
   // Convert back to JSON format for server
-  const response = credential.response as AuthenticatorAssertionResponse;
+  const response = credential.response;
   return {
     id: credential.id,
     rawId: bufferToBase64url(credential.rawId),
@@ -199,5 +199,5 @@ export async function nativeStartAuthentication(optionsJSON: AuthenticationOptio
     },
     authenticatorAttachment: credential.authenticatorAttachment,
     clientExtensionResults: credential.getClientExtensionResults(),
-  } as PublicKeyCredentialJSON;
+  };
 }
