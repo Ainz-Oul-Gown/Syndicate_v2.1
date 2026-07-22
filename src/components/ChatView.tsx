@@ -79,7 +79,6 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
     const [menuOpenUp, setMenuOpenUp] = useState(false);
     const [pinnedBannerIdx, setPinnedBannerIdx] = useState(0);
-    const pinnedScrollThrottleRef = useRef(false);
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
 
@@ -125,18 +124,14 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         if (pinned) handleScrollToMessage(pinned.id);
     };
 
-    // Banner click: scroll to the NEXT pinned message (after current trigger).
-    // The scroll handler will naturally update pinnedBannerIdx when the scroll lands.
+    // Banner click: scroll to current pinned message, then advance to next
     const handlePinnedBannerClick = () => {
         if (sortedPinnedMessages.length === 0) return;
         hapticImpact('light');
-
-        // Find the next pinned message after the current banner index
-        const nextIdx = (pinnedBannerIdx + 1) % sortedPinnedMessages.length;
-        const target = sortedPinnedMessages[nextIdx];
-        if (target) {
-            handleScrollToMessage(target.id);
-        }
+        const target = sortedPinnedMessages[pinnedBannerIdx];
+        if (target) handleScrollToMessage(target.id);
+        // Advance to next (wrap around)
+        setPinnedBannerIdx((prev) => (prev + 1) % sortedPinnedMessages.length);
     };
 
     // Reply states
@@ -946,39 +941,6 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             if (renderLimit < messages.length) {
                 setRenderLimit(prev => prev + 30);
             }
-        }
-        // Throttled: update pinned banner when the current pinned message crosses the middle
-        if (sortedPinnedMessages.length > 1 && !pinnedScrollThrottleRef.current) {
-            pinnedScrollThrottleRef.current = true;
-            requestAnimationFrame(() => {
-                const areaRect = area.getBoundingClientRect();
-                const midY = areaRect.top + areaRect.height / 2;
-                // Walk newest→oldest: find the FIRST pinned message whose center is ABOVE the middle.
-                // The one just after it (newer) is the active banner message.
-                let crossedIdx = -1;
-                for (let i = sortedPinnedMessages.length - 1; i >= 0; i--) {
-                    const el = document.getElementById(`msg-${sortedPinnedMessages[i].id}`);
-                    if (!el) continue;
-                    const elRect = el.getBoundingClientRect();
-                    const elCenter = (elRect.top + elRect.bottom) / 2;
-                    if (elCenter < midY) {
-                        crossedIdx = i;
-                        break;
-                    }
-                }
-                if (crossedIdx >= 0 && crossedIdx < sortedPinnedMessages.length - 1) {
-                    // The message at crossedIdx went above middle → show IT in the banner
-                    setPinnedBannerIdx(crossedIdx);
-                } else if (crossedIdx < 0) {
-                    // No pinned message crossed the middle yet → show the oldest (first visible)
-                    setPinnedBannerIdx(0);
-                } else {
-                    // All pinned messages crossed the middle → show the newest (last)
-                    setPinnedBannerIdx(sortedPinnedMessages.length - 1);
-                }
-                pinnedScrollThrottleRef.current = false;
-            });
-        }
     };
 
     const handleScrollToBottom = () => {
