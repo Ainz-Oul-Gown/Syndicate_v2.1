@@ -71,13 +71,13 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const [isLoadingChat, setIsLoadingChat] = useState(true);
 
     // Nav, modals and screens
-    const [activeModal, setActiveModal] = useState<'none' | 'info' | 'search' | 'debts' | 'add-debt' | 'invite-friend' | 'pinned'>('none');
+    const [activeModal, setActiveModal] = useState<'none' | 'info' | 'search' | 'debts' | 'add-debt' | 'invite-friend'>('none');
     const [activeMessageMenu, setActiveMessageMenu] = useState<string | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     const [online, setOnline] = useState(() => isOnline());
     const [isRetryingFailed, setIsRetryingFailed] = useState(false);
     const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
-    const [pinnedCarouselIdx, setPinnedCarouselIdx] = useState(0);
+    const [menuOpenUp, setMenuOpenUp] = useState(false);
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
 
@@ -87,6 +87,11 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         pinned.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         return pinned;
     })();
+
+    // Last pinned message (most recent)
+    const lastPinnedMessage = sortedPinnedMessages.length > 0
+        ? sortedPinnedMessages[sortedPinnedMessages.length - 1]
+        : null;
 
     useEffect(() => {
         try {
@@ -112,21 +117,6 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             || [...messages].reverse().find((message) => pinnedMessageIds.has(message.id));
         if (pinned) handleScrollToMessage(pinned.id);
     };
-
-    // Carousel: show last pinned message, on click scroll + advance to next (Telegram-style)
-    const handlePinnedBannerClick = () => {
-        if (sortedPinnedMessages.length === 0) return;
-        hapticImpact('light');
-        const idx = pinnedCarouselIdx % sortedPinnedMessages.length;
-        const target = sortedPinnedMessages[idx];
-        handleScrollToMessage(target.id);
-        setPinnedCarouselIdx((prev) => prev + 1);
-    };
-
-    // Reset carousel index when pinned set changes
-    useEffect(() => {
-        setPinnedCarouselIdx(0);
-    }, [pinnedMessageIds.size]);
 
     // Reply states
     const [replyTo, setReplyTo] = useState<ReplyData | null>(null);
@@ -1800,45 +1790,15 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 </button>
 
                 <div
-                    className="flex flex-col items-center justify-center text-center flex-grow mx-4 overflow-hidden"
+                    onClick={() => setActiveModal('info')}
+                    className="flex flex-col items-center justify-center text-center cursor-pointer flex-grow mx-4 overflow-hidden"
                 >
-                    <span
-                        onClick={() => {
-                            if (sortedPinnedMessages.length > 0) {
-                                hapticImpact('selection');
-                                setActiveModal('pinned');
-                            } else {
-                                setActiveModal('info');
-                            }
-                        }}
-                        className="font-semibold text-slate-200 text-base truncate max-w-full cursor-pointer hover:text-primary transition-colors"
-                    >
+                    <span className="font-semibold text-slate-200 text-base truncate max-w-full">
                         {isGroup ? groupName : chat.name}
                     </span>
-                    <span
-                        onClick={() => setActiveModal('info')}
-                        className="text-xs text-emerald-500 font-mono truncate max-w-full cursor-pointer hover:text-emerald-400 transition-colors"
-                    >
+                    <span className="text-xs text-emerald-500 font-mono truncate max-w-full">
                         {chatFingerprint}
                     </span>
-                    {/* Pinned message banner - shows last pinned message, clickable carousel */}
-                    {sortedPinnedMessages.length > 0 && (
-                        <div
-                            onClick={handlePinnedBannerClick}
-                            className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 cursor-pointer hover:bg-amber-500/15 active:scale-[0.98] transition-all max-w-full group"
-                        >
-                            <Pin className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
-                            <span className="text-[10px] text-amber-300/90 truncate max-w-[180px] font-medium">
-                                {sortedPinnedMessages[pinnedCarouselIdx % sortedPinnedMessages.length].text
-                                    || '🔗 Голосовое / вложение'}
-                            </span>
-                            {sortedPinnedMessages.length > 1 && (
-                                <span className="text-[9px] text-amber-500/60 font-mono shrink-0">
-                                    {pinnedCarouselIdx % sortedPinnedMessages.length + 1}/{sortedPinnedMessages.length}
-                                </span>
-                            )}
-                        </div>
-                    )}
                 </div>
 
                 <div className="flex gap-2.5">
@@ -1858,6 +1818,27 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                     </button>
                 </div>
             </div>
+
+            {/* Pinned message banner - full width below header */}
+            {lastPinnedMessage && (
+                <div
+                    onClick={() => {
+                        hapticImpact('light');
+                        handleScrollToMessage(lastPinnedMessage.id);
+                    }}
+                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-amber-500/8 border-b border-amber-500/20 cursor-pointer hover:bg-amber-500/12 active:bg-amber-500/15 transition-all"
+                >
+                    <Pin className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-200/80 truncate flex-1 font-medium">
+                        {lastPinnedMessage.text || '🔗 Голосовое сообщение / вложение'}
+                    </span>
+                    {sortedPinnedMessages.length > 1 && (
+                        <span className="text-[10px] text-amber-500/50 font-mono shrink-0">
+                            {sortedPinnedMessages.length}
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Messages area in reverse layout */}
             <div className="chat-container flex-grow overflow-hidden relative">
@@ -1900,7 +1881,25 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                                     transform: isSwiping ? `translateX(${swipeOffset}px)` : 'translateX(0px)',
                                                     transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
                                                 }}
-                                                onClick={(e) => { e.stopPropagation(); setActiveMessageMenu(activeMessageMenu === m.id ? null : m.id); }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (activeMessageMenu === m.id) {
+                                                        setActiveMessageMenu(null);
+                                                    } else {
+                                                        // Determine if menu should open upward (near bottom of chat)
+                                                        const msgEl = e.currentTarget as HTMLElement;
+                                                        const areaEl = messagesAreaRef.current;
+                                                        if (areaEl && msgEl) {
+                                                            const areaRect = areaEl.getBoundingClientRect();
+                                                            const msgRect = msgEl.getBoundingClientRect();
+                                                            const distFromBottom = areaRect.bottom - msgRect.bottom;
+                                                            setMenuOpenUp(distFromBottom < 120);
+                                                        } else {
+                                                            setMenuOpenUp(false);
+                                                        }
+                                                        setActiveMessageMenu(m.id);
+                                                    }
+                                                }}
                                                 className={`msg-bubble flex flex-col px-4 py-3 relative max-w-[85%] break-words overflow-hidden ${m.isMine
                                                         ? 'msg-mine bg-primary text-white rounded-[18px] rounded-br-[4px] shadow-md shadow-primary/10'
                                                         : 'msg-other bg-slate-900 border border-slate-850 text-slate-100 rounded-[18px] rounded-bl-[4px]'
@@ -2007,7 +2006,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
                                             {/* Context Menu */}
                                             {activeMessageMenu === m.id && (
-                                                <div className={`absolute top-full mt-1 flex items-center gap-1 bg-slate-900 border border-slate-700 shadow-xl rounded-xl p-1 z-50 ${m.isMine ? 'right-0' : 'left-0'}`}>
+                                                <div className={`absolute ${menuOpenUp ? 'bottom-full mb-1' : 'top-full mt-1'} flex items-center gap-1 bg-slate-900 border border-slate-700 shadow-xl rounded-xl p-1 z-50 ${m.isMine ? 'right-0' : 'left-0'}`}>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -2402,6 +2401,46 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                             </div>
                         ) : (
                             <div className="flex flex-col gap-3 mt-auto pt-6 z-10">
+                                {/* Pinned messages in profile */}
+                                {sortedPinnedMessages.length > 0 && (
+                                    <div className="bg-slate-900/30 border border-amber-500/15 p-4 rounded-2xl mb-2">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="text-[10px] font-bold text-amber-400/70 font-mono uppercase tracking-widest flex items-center gap-1.5">
+                                                <Pin className="w-3.5 h-3.5 fill-amber-400" /> Закреплённые
+                                            </h4>
+                                            <span className="text-[10px] font-bold text-amber-500 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md">
+                                                {sortedPinnedMessages.length}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
+                                            {sortedPinnedMessages.map((msg) => {
+                                                const msgDate = new Date(msg.created_at);
+                                                const dateStr = msgDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                                                return (
+                                                    <div
+                                                        key={msg.id}
+                                                        onClick={() => {
+                                                            hapticImpact('light');
+                                                            setActiveModal('none');
+                                                            setTimeout(() => handleScrollToMessage(msg.id), 300);
+                                                        }}
+                                                        className="flex flex-col gap-1 p-2.5 bg-slate-950/50 border border-slate-900 rounded-xl cursor-pointer hover:bg-amber-500/5 active:scale-[0.98] transition-all"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[9px] font-bold text-amber-400/60 font-mono uppercase">
+                                                                {msg.isMine ? 'Вы' : (msg.senderName || 'Собеседник')}
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-600 font-mono">{dateStr}</span>
+                                                        </div>
+                                                        <span className="text-xs text-slate-300 leading-relaxed break-words line-clamp-2">
+                                                            {msg.text || '🔗 Голосовое / вложение'}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                                 <button
                                     onClick={handleShowNameHistory}
                                     className="w-full bg-slate-900/50 hover:bg-slate-900 text-slate-300 font-bold font-mono tracking-wide py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] border border-slate-800/80"
@@ -2471,73 +2510,6 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                             className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono py-3 rounded-2xl transition mt-2"
                         >
                             ПОНЯТНО
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Pinned Messages List Modal */}
-            {activeModal === 'pinned' && (
-                <div className="fixed inset-0 z-[2000] bg-slate-950/90 backdrop-blur-md flex flex-col justify-center p-4 animate-fade-in font-sans">
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/90 p-5 rounded-3xl flex flex-col gap-4 max-w-sm w-full mx-auto relative shadow-2xl overflow-y-auto max-h-[85vh] scrollbar-thin">
-                        <h3 className="font-extrabold font-mono tracking-tight text-slate-100 text-base uppercase flex items-center gap-2">
-                            <Pin className="w-5 h-5 text-amber-400 fill-amber-400" /> Закреплённые сообщения
-                        </h3>
-
-                        {sortedPinnedMessages.length > 0 ? (
-                            <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-                                {sortedPinnedMessages.map((msg, index) => {
-                                    const msgDate = new Date(msg.created_at);
-                                    const dateStr = msgDate.toLocaleDateString('ru-RU', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    });
-                                    return (
-                                        <div
-                                            key={msg.id}
-                                            onClick={() => {
-                                                hapticImpact('light');
-                                                setActiveModal('none');
-                                                setTimeout(() => handleScrollToMessage(msg.id), 300);
-                                            }}
-                                            className="flex flex-col gap-1.5 p-3 bg-slate-950/60 border border-amber-500/15 rounded-xl cursor-pointer hover:bg-amber-500/5 active:scale-[0.98] transition-all"
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-bold text-amber-400/70 font-mono uppercase tracking-wider">
-                                                    {msg.isMine ? 'Вы' : (msg.senderName || 'Собеседник')}
-                                                </span>
-                                                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-                                                    <Calendar className="w-3 h-3 text-slate-600" /> {dateStr}
-                                                </div>
-                                            </div>
-                                            <span className="text-sm text-slate-200 leading-relaxed break-words">
-                                                {msg.text || '🔗 Голосовое сообщение / вложение'}
-                                            </span>
-                                            {msg.reply && (
-                                                <div className="text-[10px] text-slate-500 border-l-2 border-amber-500/30 pl-2 mt-0.5 truncate">
-                                                    ↳ {msg.reply.text}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
-                                <PinOff className="w-7 h-7 text-slate-600 mb-2" />
-                                <span className="text-xs font-bold text-slate-400 block">Нет закреплённых сообщений</span>
-                                <span className="text-[10px] text-slate-500 mt-1">Закрепите сообщение через длинное нажатие на него.</span>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={() => { hapticImpact("selection"); setActiveModal('none'); }}
-                            className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono py-3 rounded-2xl transition mt-2"
-                        >
-                            ЗАКРЫТЬ
                         </button>
                     </div>
                 </div>
