@@ -941,6 +941,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             if (renderLimit < messages.length) {
                 setRenderLimit(prev => prev + 30);
             }
+        }
     };
 
     const handleScrollToBottom = () => {
