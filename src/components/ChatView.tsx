@@ -78,6 +78,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const [isRetryingFailed, setIsRetryingFailed] = useState(false);
     const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
     const [menuOpenUp, setMenuOpenUp] = useState(false);
+    const [pinnedBannerIdx, setPinnedBannerIdx] = useState(0);
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
 
@@ -88,10 +89,15 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         return pinned;
     })();
 
-    // Last pinned message (most recent)
-    const lastPinnedMessage = sortedPinnedMessages.length > 0
-        ? sortedPinnedMessages[sortedPinnedMessages.length - 1]
+    // Current pinned message shown in banner
+    const currentPinnedForBanner = sortedPinnedMessages.length > 0
+        ? sortedPinnedMessages[Math.min(pinnedBannerIdx, sortedPinnedMessages.length - 1)]
         : null;
+
+    // Reset banner index when pinned set changes
+    useEffect(() => {
+        setPinnedBannerIdx(sortedPinnedMessages.length > 0 ? sortedPinnedMessages.length - 1 : 0);
+    }, [pinnedMessageIds.size]);
 
     useEffect(() => {
         try {
@@ -116,6 +122,16 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         const pinned = messages.findLast?.((message) => pinnedMessageIds.has(message.id))
             || [...messages].reverse().find((message) => pinnedMessageIds.has(message.id));
         if (pinned) handleScrollToMessage(pinned.id);
+    };
+
+    // Banner click: scroll to current pinned, then advance to next
+    const handlePinnedBannerClick = () => {
+        if (sortedPinnedMessages.length === 0) return;
+        hapticImpact('light');
+        const target = sortedPinnedMessages[pinnedBannerIdx];
+        if (target) handleScrollToMessage(target.id);
+        // Advance to next (wrap around)
+        setPinnedBannerIdx((prev) => (prev + 1) % sortedPinnedMessages.length);
     };
 
     // Reply states
@@ -924,6 +940,23 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         if (Math.abs(area.scrollTop) + area.clientHeight >= area.scrollHeight - 300) {
             if (renderLimit < messages.length) {
                 setRenderLimit(prev => prev + 30);
+            }
+        }
+        // Update pinned banner based on visible pinned messages
+        if (sortedPinnedMessages.length > 1) {
+            const areaRect = area.getBoundingClientRect();
+            const thresholdY = areaRect.top + areaRect.height * 0.67; // 2/3 from top of visible area
+            // Walk from newest pinned to oldest; first one whose top is above threshold wins
+            for (let i = sortedPinnedMessages.length - 1; i >= 0; i--) {
+                const el = document.getElementById(`msg-${sortedPinnedMessages[i].id}`);
+                if (el) {
+                    const elRect = el.getBoundingClientRect();
+                    // elRect.top < thresholdY means the message is in the upper 2/3 of the screen
+                    if (elRect.top < thresholdY && elRect.bottom > areaRect.top) {
+                        setPinnedBannerIdx(i);
+                        break;
+                    }
+                }
             }
         }
     };
@@ -1820,21 +1853,18 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             </div>
 
             {/* Pinned message banner - full width below header */}
-            {lastPinnedMessage && (
+            {currentPinnedForBanner && (
                 <div
-                    onClick={() => {
-                        hapticImpact('light');
-                        handleScrollToMessage(lastPinnedMessage.id);
-                    }}
+                    onClick={handlePinnedBannerClick}
                     className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-amber-500/8 border-b border-amber-500/20 cursor-pointer hover:bg-amber-500/12 active:bg-amber-500/15 transition-all"
                 >
                     <Pin className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
                     <span className="text-xs text-amber-200/80 truncate flex-1 font-medium">
-                        {lastPinnedMessage.text || '🔗 Голосовое сообщение / вложение'}
+                        {currentPinnedForBanner?.text || '🔗 Голосовое сообщение / вложение'}
                     </span>
                     {sortedPinnedMessages.length > 1 && (
                         <span className="text-[10px] text-amber-500/50 font-mono shrink-0">
-                            {sortedPinnedMessages.length}
+                            {pinnedBannerIdx + 1}/{sortedPinnedMessages.length}
                         </span>
                     )}
                 </div>
