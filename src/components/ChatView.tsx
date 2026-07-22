@@ -952,8 +952,8 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 const elRect = el.getBoundingClientRect();
                 // This pinned message just crossed above the trigger line
                 if (elRect.top < triggerY && elRect.bottom > areaRect.top) {
-                    // Show the NEXT pinned message (older) in the banner
-                    const nextIdx = Math.min(i + 1, sortedPinnedMessages.length - 1);
+                    // Show the NEXT pinned message (or wrap to first if at the end)
+                    const nextIdx = (i + 1) % sortedPinnedMessages.length;
                     setPinnedBannerIdx(nextIdx);
                     break;
                 }
@@ -1856,14 +1856,14 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             {currentPinnedForBanner && (
                 <div
                     onClick={handlePinnedBannerClick}
-                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-amber-500/8 border-b border-amber-500/20 cursor-pointer hover:bg-amber-500/12 active:bg-amber-500/15 transition-all"
+                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-primary/8 border-b border-primary/20 cursor-pointer hover:bg-primary/12 active:bg-primary/15 transition-all"
                 >
-                    <Pin className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                    <span className="text-xs text-amber-200/80 truncate flex-1 font-medium">
+                    <Pin className="w-3.5 h-3.5 text-primary fill-primary shrink-0" />
+                    <span className="text-xs text-primary/80 truncate flex-1 font-medium">
                         {currentPinnedForBanner?.text || '🔗 Голосовое сообщение / вложение'}
                     </span>
                     {sortedPinnedMessages.length > 1 && (
-                        <span className="text-[10px] text-amber-500/50 font-mono shrink-0">
+                        <span className="text-[10px] text-primary/50 font-mono shrink-0">
                             {pinnedBannerIdx + 1}/{sortedPinnedMessages.length}
                         </span>
                     )}
@@ -1936,7 +1936,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                                     }`}
                                             >
                                                 {pinnedMessageIds.has(m.id) && (
-                                                    <div className={`mb-1 flex items-center gap-1 text-[10px] font-semibold ${m.isMine ? 'text-white/70' : 'text-amber-300'}`}>
+                                                    <div className={`mb-1 flex items-center gap-1 text-[10px] font-semibold ${m.isMine ? 'text-white/70' : 'text-primary'}`}>
                                                         <Pin className="w-3 h-3 fill-current" /> Закреплено
                                                     </div>
                                                 )}
@@ -2062,11 +2062,11 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                                             className="flex flex-col items-center justify-center gap-1 min-w-[70px] p-2 rounded-lg hover:bg-slate-800 transition"
                                                         >
                                                             {pinnedMessageIds.has(m.id) ? (
-                                                                <PinOff className="w-5 h-5 text-amber-400" />
+                                                                <PinOff className="w-5 h-5 text-primary" />
                                                             ) : (
                                                                 <Pin className="w-5 h-5 text-slate-300" />
                                                             )}
-                                                            <span className={`text-[10px] font-semibold ${pinnedMessageIds.has(m.id) ? 'text-amber-400' : 'text-slate-400'}`}>
+                                                            <span className={`text-[10px] font-semibold ${pinnedMessageIds.has(m.id) ? 'text-primary' : 'text-slate-400'}`}>
                                                                 {pinnedMessageIds.has(m.id) ? 'Открепить' : 'Закрепить'}
                                                             </span>
                                                         </button>
@@ -2433,12 +2433,12 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                             <div className="flex flex-col gap-2 mt-auto pt-2 z-10 flex-shrink-0">
                                 {/* Pinned messages in profile */}
                                 {sortedPinnedMessages.length > 0 && (
-                                    <div className="bg-slate-900/30 border border-amber-500/15 p-3 rounded-2xl mb-1">
+                                    <div className="bg-slate-900/30 border border-primary/15 p-3 rounded-2xl mb-1">
                                         <div className="flex items-center justify-between mb-3">
-                                            <h4 className="text-[10px] font-bold text-amber-400/70 font-mono uppercase tracking-widest flex items-center gap-1.5">
-                                                <Pin className="w-3.5 h-3.5 fill-amber-400" /> Закреплённые
+                                            <h4 className="text-[10px] font-bold text-primary/70 font-mono uppercase tracking-widest flex items-center gap-1.5">
+                                                <Pin className="w-3.5 h-3.5 fill-primary" /> Закреплённые
                                             </h4>
-                                            <span className="text-[10px] font-bold text-amber-500 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md">
+                                            <span className="text-[10px] font-bold text-primary font-mono bg-primary/10 px-2 py-0.5 rounded-md">
                                                 {sortedPinnedMessages.length}
                                             </span>
                                         </div>
@@ -2454,10 +2454,10 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                                             setActiveModal('none');
                                                             setTimeout(() => handleScrollToMessage(msg.id), 300);
                                                         }}
-                                                        className="flex flex-col gap-1 p-2.5 bg-slate-950/50 border border-slate-900 rounded-xl cursor-pointer hover:bg-amber-500/5 active:scale-[0.98] transition-all"
+                                                        className="flex flex-col gap-1 p-2.5 bg-slate-950/50 border border-slate-900 rounded-xl cursor-pointer hover:bg-primary/5 active:scale-[0.98] transition-all"
                                                     >
                                                         <div className="flex items-center justify-between">
-                                                            <span className="text-[9px] font-bold text-amber-400/60 font-mono uppercase">
+                                                            <span className="text-[9px] font-bold text-primary/60 font-mono uppercase">
                                                                 {msg.isMine ? 'Вы' : (msg.senderName || 'Собеседник')}
                                                             </span>
                                                             <span className="text-[9px] text-slate-600 font-mono">{dateStr}</span>
