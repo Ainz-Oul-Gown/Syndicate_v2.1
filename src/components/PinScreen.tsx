@@ -50,20 +50,18 @@ export default function PinScreen({
         const options = await optsRes.json();
         if (options.error) throw new Error(options.error);
         
-        // Start Passkey Auth in browser with adaptive user verification to prioritize fingerprint
+        // Start Passkey Auth in browser.
+        // Use server-generated options directly without client modifications.
+        // The server sets userVerification (preferred) and allowCredentials correctly.
+        // Client-side modifications (setting userVerification to 'required') can break
+        // the browser's ability to use the platform authenticator (fingerprint/FaceID)
+        // and cause NFC/USB key prompts instead.
         let asseResp;
         try {
-          const adaptedOptions = JSON.parse(JSON.stringify(options));
-          // Require user verification to immediately invoke the biometric/fingerprint sensor dialog on Android
-          adaptedOptions.userVerification = 'required';
-          asseResp = await startAuthentication({ optionsJSON: adaptedOptions });
+          asseResp = await startAuthentication({ optionsJSON: options });
         } catch (e1: any) {
-          console.warn('Smart WebAuthn authentication failed in pin screen, trying standard options...', e1);
-          try {
-            asseResp = await startAuthentication({ optionsJSON: options });
-          } catch (e2: any) {
-            throw new Error('Авторизация Passkey отменена или не удалась: ' + e2.message);
-          }
+          console.warn('WebAuthn authentication failed in pin screen...', e1);
+          throw new Error('Авторизация Passkey отменена или не удалась: ' + e1.message);
         }
         
         const { data: verifyData, error: verifyErr } = await supabaseClient.functions.invoke('webauthn-verify-authentication', {

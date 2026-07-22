@@ -32,7 +32,10 @@ serve(async (req) => {
       rpID,
       allowCredentials: passkeys.map((credential: any) => ({
         id: credential.id,
-        transports: credential.transports,
+        // Ensure transports always has a value. An empty/missing transports array
+        // causes the browser to look for any authenticator (USB/NFC keys) instead
+        // of using the platform authenticator (fingerprint/FaceID).
+        transports: credential.transports?.length ? credential.transports : ['internal'],
       })),
       userVerification: 'preferred',
     })

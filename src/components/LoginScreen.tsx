@@ -669,32 +669,12 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         
         let attResp;
         try {
-          const adaptedOptions = JSON.parse(JSON.stringify(options));
-          
-          // Match the exact structure from the article:
-          adaptedOptions.authenticatorSelection = {
-            authenticatorAttachment: 'platform',
-            userVerification: 'preferred'
-          };
-          
-          // The article only has alg -7 (ES256)
-          if (adaptedOptions.pubKeyCredParams) {
-             adaptedOptions.pubKeyCredParams = [{ type: "public-key", alg: -7 }];
-          }
-          
-          // Match timeout
-          adaptedOptions.timeout = 300000;
-          
-          // Remove rp.id to let the browser infer it natively (matches article)
-          if (adaptedOptions.rp && adaptedOptions.rp.id) {
-             delete adaptedOptions.rp.id;
-          }
-
-          // Remove excludeCredentials if empty
-          if (adaptedOptions.excludeCredentials && adaptedOptions.excludeCredentials.length === 0) {
-            delete adaptedOptions.excludeCredentials;
-          }
-          attResp = await startRegistration({ optionsJSON: adaptedOptions });
+          // Use server-generated options directly without client modifications.
+          // The server sets authenticatorSelection (platform), userVerification (preferred),
+          // and rp.id correctly. Client-side modifications (deleting rp.id, overwriting
+          // authenticatorSelection) break the browser's ability to find the platform
+          // authenticator (fingerprint/FaceID) and cause NFC/USB key prompts instead.
+          attResp = await startRegistration({ optionsJSON: options });
         } catch (e: any) {
           throw new Error('Не удалось зарегистрировать Passkey. Убедитесь, что отпечаток пальца или FaceID настроены на вашем устройстве. (' + e.message + ')');
         }
@@ -812,11 +792,13 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
 
         let asseResp;
         try {
-          const adaptedOptions = JSON.parse(JSON.stringify(options));
-          adaptedOptions.userVerification = 'preferred';
-          asseResp = await startAuthentication({ optionsJSON: adaptedOptions });
+          // Use server-generated options directly without client modifications.
+          // The server sets userVerification (preferred) and allowCredentials correctly.
+          // Client-side modifications (overwriting userVerification) can break the
+          // browser's ability to use the platform authenticator (fingerprint/FaceID).
+          asseResp = await startAuthentication({ optionsJSON: options });
         } catch (e: any) {
-          throw new Error('Авторизация Passkey отменена или не удалась (требуется биометрия): ' + e.message);
+          throw new Error('Авторизация Passkey отменена или не удалась: ' + e.message);
         }
 
         // 3. Verify Auth with Server

@@ -51,11 +51,16 @@ serve(async (req) => {
     if (!verification.verified || !verification.registrationInfo) throw new Error('Регистрация Passkey не подтверждена')
 
     const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo
+    // Ensure transports always contains ['internal'] for platform authenticators.
+    // An empty transports array causes the browser to treat any authenticator (including
+    // USB/NFC keys) as valid during authentication, showing the wrong dialog.
+    const rawTransports = credential.transports || response.response?.transports || []
+    const transports = rawTransports.length > 0 ? rawTransports : ['internal']
     const newCredential = {
       id: credential.id,
       publicKey: encodeBase64Url(credential.publicKey),
       counter: credential.counter,
-      transports: credential.transports || response.response?.transports || [],
+      transports,
       deviceType: credentialDeviceType,
       backedUp: credentialBackedUp,
     }

@@ -369,24 +369,20 @@ hapticImpact("selection");
           const options = await optsRes.json();
           if (options.error) throw new Error(options.error);
 
-          // Start Passkey Registration in browser with smart biometric optimization and robust fallbacks
+          // Start Passkey Registration in browser.
+          // Use server-generated options directly. The server sets
+          // authenticatorSelection (platform), userVerification (preferred),
+          // and rp.id correctly. Client-side modifications (deleting authenticatorAttachment,
+          // overwriting userVerification, setting residentKey to required) break
+          // the browser's ability to find the platform authenticator (fingerprint/FaceID)
+          // and cause NFC/USB key prompts instead.
           let attResp;
           try {
-            // Attempt 1: Smart adaptation (Require Resident Key and User Verification, remove strict platform attachment to bypass Android Chrome bugs)
-            const adaptedOptions = JSON.parse(JSON.stringify(options));
-            if (adaptedOptions.authenticatorSelection) {
-              adaptedOptions.authenticatorSelection.residentKey = 'required';
-              adaptedOptions.authenticatorSelection.requireResidentKey = true;
-              adaptedOptions.authenticatorSelection.userVerification = 'required';
-              // Remove 'platform' constraint so Chrome displays a friendly native system selector where 
-              // "This Device / Screen Lock" (Fingerprint) is available as the primary secure choice.
-              delete adaptedOptions.authenticatorSelection.authenticatorAttachment;
-            }
-            attResp = await startRegistration({ optionsJSON: adaptedOptions });
+            attResp = await startRegistration({ optionsJSON: options });
           } catch (e1: any) {
-            console.warn('Smart WebAuthn registration failed in settings, trying direct platform fallback...', e1);
+            console.warn('WebAuthn registration with server options failed, trying with explicit platform fallback...', e1);
             try {
-              // Attempt 2: Direct platform mode (Force system authenticator)
+              // Fallback: explicitly set platform authenticator with safe defaults
               const platformOptions = JSON.parse(JSON.stringify(options));
               if (platformOptions.authenticatorSelection) {
                 platformOptions.authenticatorSelection.authenticatorAttachment = 'platform';
@@ -395,13 +391,7 @@ hapticImpact("selection");
               }
               attResp = await startRegistration({ optionsJSON: platformOptions });
             } catch (e2: any) {
-              console.warn('Platform WebAuthn registration failed in settings, trying server-side default options...', e2);
-              try {
-                // Attempt 3: Standard options returned from server
-                attResp = await startRegistration({ optionsJSON: options });
-              } catch (e3: any) {
-                throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или графический ключ для разблокировки экрана, а в Chrome включено автозаполнение паролей. Ошибка: ' + e3.message);
-              }
+              throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или FaceID. Ошибка: ' + e2.message);
             }
           }
 
