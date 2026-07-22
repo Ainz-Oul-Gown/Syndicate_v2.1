@@ -1,5 +1,5 @@
 import { supabaseClient } from "../lib/supabase";
-import { startAuthentication } from "@simplewebauthn/browser";
+import { nativeStartAuthentication } from "../lib/webauthn";
 
 import { hapticImpact } from "../lib/haptics";
 import { useState, useEffect } from 'react';
@@ -58,7 +58,7 @@ export default function PinScreen({
         // and cause NFC/USB key prompts instead.
         let asseResp;
         try {
-          asseResp = await startAuthentication({ optionsJSON: options });
+          asseResp = await nativeStartAuthentication(options);
         } catch (e1: any) {
           console.warn('WebAuthn authentication failed in pin screen...', e1);
           throw new Error('Авторизация Passkey отменена или не удалась: ' + e1.message);

@@ -1,4 +1,4 @@
-﻿import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
+﻿import { nativeStartRegistration, nativeStartAuthentication } from "../lib/webauthn";
 import React, { useEffect, useState, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { clearSensitiveBrowserState } from '../lib/sessionStorage';
@@ -674,7 +674,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
           // and rp.id correctly. Client-side modifications (deleting rp.id, overwriting
           // authenticatorSelection) break the browser's ability to find the platform
           // authenticator (fingerprint/FaceID) and cause NFC/USB key prompts instead.
-          attResp = await startRegistration({ optionsJSON: options });
+          attResp = await nativeStartRegistration(options);
         } catch (e: any) {
           throw new Error('Не удалось зарегистрировать Passkey. Убедитесь, что отпечаток пальца или FaceID настроены на вашем устройстве. (' + e.message + ')');
         }
@@ -796,7 +796,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
           // The server sets userVerification (preferred) and allowCredentials correctly.
           // Client-side modifications (overwriting userVerification) can break the
           // browser's ability to use the platform authenticator (fingerprint/FaceID).
-          asseResp = await startAuthentication({ optionsJSON: options });
+          asseResp = await nativeStartAuthentication(options);
         } catch (e: any) {
           throw new Error('Авторизация Passkey отменена или не удалась: ' + e.message);
         }
