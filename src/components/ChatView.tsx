@@ -71,14 +71,22 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const [isLoadingChat, setIsLoadingChat] = useState(true);
 
     // Nav, modals and screens
-    const [activeModal, setActiveModal] = useState<'none' | 'info' | 'search' | 'debts' | 'add-debt' | 'invite-friend'>('none');
+    const [activeModal, setActiveModal] = useState<'none' | 'info' | 'search' | 'debts' | 'add-debt' | 'invite-friend' | 'pinned'>('none');
     const [activeMessageMenu, setActiveMessageMenu] = useState<string | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     const [online, setOnline] = useState(() => isOnline());
     const [isRetryingFailed, setIsRetryingFailed] = useState(false);
     const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
+    const [pinnedCarouselIdx, setPinnedCarouselIdx] = useState(0);
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
+
+    // Sorted pinned messages by chat history (oldest first, like in chat)
+    const sortedPinnedMessages = (() => {
+        const pinned = messages.filter((m) => pinnedMessageIds.has(m.id));
+        pinned.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        return pinned;
+    })();
 
     useEffect(() => {
         try {
@@ -104,6 +112,21 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             || [...messages].reverse().find((message) => pinnedMessageIds.has(message.id));
         if (pinned) handleScrollToMessage(pinned.id);
     };
+
+    // Carousel: show last pinned message, on click scroll + advance to next (Telegram-style)
+    const handlePinnedBannerClick = () => {
+        if (sortedPinnedMessages.length === 0) return;
+        hapticImpact('light');
+        const idx = pinnedCarouselIdx % sortedPinnedMessages.length;
+        const target = sortedPinnedMessages[idx];
+        handleScrollToMessage(target.id);
+        setPinnedCarouselIdx((prev) => prev + 1);
+    };
+
+    // Reset carousel index when pinned set changes
+    useEffect(() => {
+        setPinnedCarouselIdx(0);
+    }, [pinnedMessageIds.size]);
 
     // Reply states
     const [replyTo, setReplyTo] = useState<ReplyData | null>(null);
@@ -1777,15 +1800,45 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 </button>
 
                 <div
-                    onClick={() => setActiveModal('info')}
-                    className="flex flex-col items-center justify-center text-center cursor-pointer flex-grow mx-4 overflow-hidden"
+                    className="flex flex-col items-center justify-center text-center flex-grow mx-4 overflow-hidden"
                 >
-                    <span className="font-semibold text-slate-200 text-base truncate max-w-full">
+                    <span
+                        onClick={() => {
+                            if (sortedPinnedMessages.length > 0) {
+                                hapticImpact('selection');
+                                setActiveModal('pinned');
+                            } else {
+                                setActiveModal('info');
+                            }
+                        }}
+                        className="font-semibold text-slate-200 text-base truncate max-w-full cursor-pointer hover:text-primary transition-colors"
+                    >
                         {isGroup ? groupName : chat.name}
                     </span>
-                    <span className="text-xs text-emerald-500 font-mono truncate max-w-full">
+                    <span
+                        onClick={() => setActiveModal('info')}
+                        className="text-xs text-emerald-500 font-mono truncate max-w-full cursor-pointer hover:text-emerald-400 transition-colors"
+                    >
                         {chatFingerprint}
                     </span>
+                    {/* Pinned message banner - shows last pinned message, clickable carousel */}
+                    {sortedPinnedMessages.length > 0 && (
+                        <div
+                            onClick={handlePinnedBannerClick}
+                            className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 cursor-pointer hover:bg-amber-500/15 active:scale-[0.98] transition-all max-w-full group"
+                        >
+                            <Pin className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                            <span className="text-[10px] text-amber-300/90 truncate max-w-[180px] font-medium">
+                                {sortedPinnedMessages[pinnedCarouselIdx % sortedPinnedMessages.length].text
+                                    || '🔗 Голосовое / вложение'}
+                            </span>
+                            {sortedPinnedMessages.length > 1 && (
+                                <span className="text-[9px] text-amber-500/60 font-mono shrink-0">
+                                    {pinnedCarouselIdx % sortedPinnedMessages.length + 1}/{sortedPinnedMessages.length}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex gap-2.5">
@@ -2418,6 +2471,73 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                             className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono py-3 rounded-2xl transition mt-2"
                         >
                             ПОНЯТНО
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Pinned Messages List Modal */}
+            {activeModal === 'pinned' && (
+                <div className="fixed inset-0 z-[2000] bg-slate-950/90 backdrop-blur-md flex flex-col justify-center p-4 animate-fade-in font-sans">
+                    <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/90 p-5 rounded-3xl flex flex-col gap-4 max-w-sm w-full mx-auto relative shadow-2xl overflow-y-auto max-h-[85vh] scrollbar-thin">
+                        <h3 className="font-extrabold font-mono tracking-tight text-slate-100 text-base uppercase flex items-center gap-2">
+                            <Pin className="w-5 h-5 text-amber-400 fill-amber-400" /> Закреплённые сообщения
+                        </h3>
+
+                        {sortedPinnedMessages.length > 0 ? (
+                            <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                                {sortedPinnedMessages.map((msg, index) => {
+                                    const msgDate = new Date(msg.created_at);
+                                    const dateStr = msgDate.toLocaleDateString('ru-RU', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    });
+                                    return (
+                                        <div
+                                            key={msg.id}
+                                            onClick={() => {
+                                                hapticImpact('light');
+                                                setActiveModal('none');
+                                                setTimeout(() => handleScrollToMessage(msg.id), 300);
+                                            }}
+                                            className="flex flex-col gap-1.5 p-3 bg-slate-950/60 border border-amber-500/15 rounded-xl cursor-pointer hover:bg-amber-500/5 active:scale-[0.98] transition-all"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-amber-400/70 font-mono uppercase tracking-wider">
+                                                    {msg.isMine ? 'Вы' : (msg.senderName || 'Собеседник')}
+                                                </span>
+                                                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
+                                                    <Calendar className="w-3 h-3 text-slate-600" /> {dateStr}
+                                                </div>
+                                            </div>
+                                            <span className="text-sm text-slate-200 leading-relaxed break-words">
+                                                {msg.text || '🔗 Голосовое сообщение / вложение'}
+                                            </span>
+                                            {msg.reply && (
+                                                <div className="text-[10px] text-slate-500 border-l-2 border-amber-500/30 pl-2 mt-0.5 truncate">
+                                                    ↳ {msg.reply.text}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
+                                <PinOff className="w-7 h-7 text-slate-600 mb-2" />
+                                <span className="text-xs font-bold text-slate-400 block">Нет закреплённых сообщений</span>
+                                <span className="text-[10px] text-slate-500 mt-1">Закрепите сообщение через длинное нажатие на него.</span>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => { hapticImpact("selection"); setActiveModal('none'); }}
+                            className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono py-3 rounded-2xl transition mt-2"
+                        >
+                            ЗАКРЫТЬ
                         </button>
                     </div>
                 </div>
