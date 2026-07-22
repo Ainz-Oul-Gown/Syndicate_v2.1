@@ -942,6 +942,23 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 setRenderLimit(prev => prev + 30);
             }
         }
+        // Smart scroll-based pinned trigger: when a pinned message crosses 5px above center
+        if (sortedPinnedMessages.length > 1) {
+            const areaRect = area.getBoundingClientRect();
+            const triggerY = areaRect.top + areaRect.height / 2 - 5; // 5px above center
+            for (let i = 0; i < sortedPinnedMessages.length; i++) {
+                const el = document.getElementById(`msg-${sortedPinnedMessages[i].id}`);
+                if (!el) continue;
+                const elRect = el.getBoundingClientRect();
+                // This pinned message just crossed above the trigger line
+                if (elRect.top < triggerY && elRect.bottom > areaRect.top) {
+                    // Show the NEXT pinned message (older) in the banner
+                    const nextIdx = Math.min(i + 1, sortedPinnedMessages.length - 1);
+                    setPinnedBannerIdx(nextIdx);
+                    break;
+                }
+            }
+        }
     };
 
     const handleScrollToBottom = () => {
@@ -2311,8 +2328,8 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
             {/* Info details screen */}
             {activeModal === 'info' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950 p-5 overflow-y-auto flex flex-col font-sans animate-fade-in">
-                    <div className="max-w-md mx-auto w-full flex flex-col h-full">
+                <div className="fixed inset-0 z-[1000] bg-slate-950 p-5 flex flex-col font-sans animate-fade-in">
+                    <div className="max-w-md mx-auto w-full flex flex-col h-full overflow-hidden">
                         <div className="flex items-center justify-between pb-4 border-b border-slate-900 mb-8 shrink-0">
                             <button
                                 onClick={() => setActiveModal('none')}
@@ -2326,7 +2343,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                             <div className="w-16" />
                         </div>
 
-                        <div className="flex flex-col items-center mb-10 relative">
+                        <div className="flex flex-col items-center mb-4 relative flex-shrink-0">
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
                             <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-800 flex items-center justify-center text-4xl font-bold font-mono text-primary shadow-xl shadow-black/50 mb-4 z-10">
@@ -2351,7 +2368,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                         </div>
 
                         {isGroup ? (
-                            <div className="flex flex-col gap-5 flex-grow z-10">
+                            <div className="flex flex-col gap-3 flex-grow z-10 overflow-hidden">
                                 <button
                                     onClick={() => setActiveModal('invite-friend')}
                                     className="w-full bg-primary hover:bg-primary-hover active:bg-primary/90 text-white font-bold font-mono tracking-wide py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20"
@@ -2395,7 +2412,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-3 mt-auto pt-6">
+                                <div className="flex flex-col gap-2 mt-auto pt-2 flex-shrink-0">
                                     <button
                                         onClick={handleLeaveGroup}
                                         className="w-full bg-slate-900/50 hover:bg-slate-800 text-rose-400 font-bold font-mono tracking-wide py-3.5 rounded-2xl flex items-center justify-center gap-2 transition border border-rose-500/20"
@@ -2413,10 +2430,10 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-3 mt-auto pt-6 z-10">
+                            <div className="flex flex-col gap-2 mt-auto pt-2 z-10 flex-shrink-0">
                                 {/* Pinned messages in profile */}
                                 {sortedPinnedMessages.length > 0 && (
-                                    <div className="bg-slate-900/30 border border-amber-500/15 p-4 rounded-2xl mb-2">
+                                    <div className="bg-slate-900/30 border border-amber-500/15 p-3 rounded-2xl mb-1">
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="text-[10px] font-bold text-amber-400/70 font-mono uppercase tracking-widest flex items-center gap-1.5">
                                                 <Pin className="w-3.5 h-3.5 fill-amber-400" /> Закреплённые
@@ -2425,7 +2442,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                                                 {sortedPinnedMessages.length}
                                             </span>
                                         </div>
-                                        <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
+                                        <div className="space-y-1.5 max-h-[25vh] overflow-y-auto pr-1">
                                             {sortedPinnedMessages.map((msg) => {
                                                 const msgDate = new Date(msg.created_at);
                                                 const dateStr = msgDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
