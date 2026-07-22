@@ -947,31 +947,34 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 setRenderLimit(prev => prev + 30);
             }
         }
-        // Throttled: update pinned banner based on visible pinned messages
+        // Throttled: update pinned banner when the current pinned message crosses the middle
         if (sortedPinnedMessages.length > 1 && !pinnedScrollThrottleRef.current) {
             pinnedScrollThrottleRef.current = true;
             requestAnimationFrame(() => {
                 const areaRect = area.getBoundingClientRect();
-                // Find the pinned message closest to the TOP of the visible area
-                // (the one the user is about to scroll past)
-                let bestIdx = -1;
-                let bestDist = Infinity;
-                for (let i = 0; i < sortedPinnedMessages.length; i++) {
+                const midY = areaRect.top + areaRect.height / 2;
+                // Walk newest→oldest: find the FIRST pinned message whose center is ABOVE the middle.
+                // The one just after it (newer) is the active banner message.
+                let crossedIdx = -1;
+                for (let i = sortedPinnedMessages.length - 1; i >= 0; i--) {
                     const el = document.getElementById(`msg-${sortedPinnedMessages[i].id}`);
                     if (!el) continue;
                     const elRect = el.getBoundingClientRect();
-                    // Is this element visible in the viewport?
-                    if (elRect.bottom > areaRect.top && elRect.top < areaRect.bottom) {
-                        // Distance from the top of viewport — smaller = closer to top = should be shown
-                        const dist = elRect.top - areaRect.top;
-                        if (dist < bestDist) {
-                            bestDist = dist;
-                            bestIdx = i;
-                        }
+                    const elCenter = (elRect.top + elRect.bottom) / 2;
+                    if (elCenter < midY) {
+                        crossedIdx = i;
+                        break;
                     }
                 }
-                if (bestIdx >= 0) {
-                    setPinnedBannerIdx(bestIdx);
+                if (crossedIdx >= 0 && crossedIdx < sortedPinnedMessages.length - 1) {
+                    // The message at crossedIdx went above middle → show the NEXT newer one
+                    setPinnedBannerIdx(crossedIdx + 1);
+                } else if (crossedIdx < 0) {
+                    // No pinned message crossed the middle yet → show the oldest (first visible)
+                    setPinnedBannerIdx(0);
+                } else {
+                    // All pinned messages crossed the middle → show the newest (last)
+                    setPinnedBannerIdx(sortedPinnedMessages.length - 1);
                 }
                 pinnedScrollThrottleRef.current = false;
             });
