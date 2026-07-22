@@ -88,6 +88,10 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     })),
     timeout: optionsJSON.timeout ?? 60000,
     attestation: (optionsJSON.attestation as AttestationConveyancePreference) ?? 'none',
+    // hints tells the browser which authenticator to prefer.
+    // 'client-device' = platform authenticator (fingerprint/FaceID/screen lock).
+    // This is the key to getting fingerprint prompt instead of NFC/USB on Android Chrome.
+    hints: ['client-device'] as any,
   };
 
   // Only add authenticatorSelection if present (without authenticatorAttachment)
@@ -150,6 +154,9 @@ export async function nativeStartAuthentication(optionsJSON: AuthenticationOptio
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: base64urlToBuffer(optionsJSON.challenge),
     timeout: optionsJSON.timeout ?? 60000,
+    // hints tells the browser which authenticator to prefer.
+    // 'client-device' = platform authenticator (fingerprint/FaceID/screen lock).
+    hints: ['client-device'] as any,
   };
 
   // Only add rpId if present (otherwise browser uses current origin)
