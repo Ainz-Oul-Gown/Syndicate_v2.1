@@ -1704,18 +1704,30 @@ export default function App() {
                             const filteredRequests = friendRequests.filter((req) =>
                                 req.user.first_name.toLowerCase().includes(chatSearch.toLowerCase())
                             );
+                            const pinnedOrder = [...pinnedChatIds]; // preserves insertion order
                             const chatPriority = (chatId?: string) => {
-                                if (!chatId) return 2;
-                                if (pinnedChatIds.has(chatId)) return 0;
-                                if (unreadChatIds.has(chatId)) return 1;
-                                return 2;
+                                if (!chatId) return [2, 0];
+                                if (pinnedChatIds.has(chatId)) {
+                                    const idx = pinnedOrder.indexOf(chatId);
+                                    return [0, idx >= 0 ? idx : 0]; // pinned: sort by pin order
+                                }
+                                if (unreadChatIds.has(chatId)) return [1, 0];
+                                return [2, 0];
                             };
                             const filteredGroupChats = groupChats
                                 .filter((g) => g.name.toLowerCase().includes(chatSearch.toLowerCase()))
-                                .sort((a, b) => chatPriority(a.id) - chatPriority(b.id));
+                                .sort((a, b) => {
+                                    const [pa, oa] = chatPriority(a.id);
+                                    const [pb, ob] = chatPriority(b.id);
+                                    return pa !== pb ? pa - pb : oa - ob;
+                                });
                             const filteredFriends = friends
                                 .filter((f) => f.first_name.toLowerCase().includes(chatSearch.toLowerCase()))
-                                .sort((a, b) => chatPriority(privateChatByFriendId[a.tg_id]) - chatPriority(privateChatByFriendId[b.tg_id]));
+                                .sort((a, b) => {
+                                    const [pa, oa] = chatPriority(privateChatByFriendId[a.tg_id]);
+                                    const [pb, ob] = chatPriority(privateChatByFriendId[b.tg_id]);
+                                    return pa !== pb ? pa - pb : oa - ob;
+                                });
 
                             const hasRequests = filteredRequests.length > 0;
                             const hasGroups = filteredGroupChats.length > 0;
