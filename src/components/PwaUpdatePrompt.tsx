@@ -58,33 +58,47 @@ export default function PwaUpdatePrompt() {
 
   if (!showModal) return null;
 
-  const applyUpdate = async () => {
+  const applyUpdate = () => {
     if (isApplying) return;
     setIsApplying(true);
     hapticImpact('warning');
 
-    try {
-      // Clear all caches
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((name) => caches.delete(name)));
-      }
-    } catch (error) {
-      console.error('Failed to clear caches:', error);
-    }
+    // Best-effort cleanup with timeouts, then force reload
+    const forceReload = () => {
+      // Cache-bust to bypass any remaining cached assets
+      const url = new URL(window.location.href);
+      url.searchParams.set('_v', Date.now().toString());
+      window.location.replace(url.toString());
+    };
 
-    // Unregister service worker to ensure fresh load
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((r) => r.unregister()));
-      }
-    } catch (error) {
-      console.error('Failed to unregister SW:', error);
-    }
+    // Try to clear caches and unregister SW, but always reload after 2s max
+    const cleanupPromise = (async () => {
+      try {
+        if ('caches' in window) {
+          const names = await Promise.race([
+            caches.keys(),
+            new Promise<string[]>((r) => setTimeout(() => r([]), 1500)),
+          ]);
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+      } catch { /* ignore */ }
 
-    // Hard reload — always
-    window.location.reload();
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await Promise.race([
+            navigator.serviceWorker.getRegistrations(),
+            new Promise<any[]>((r) => setTimeout(() => r([]), 1500)),
+          ]);
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch { /* ignore */ }
+    })();
+
+    // Guarantee reload within 3 seconds even if cleanup hangs
+    Promise.race([
+      cleanupPromise,
+      new Promise((r) => setTimeout(r, 3000)),
+    ]).then(forceReload);
   };
 
   const dismiss = () => {

@@ -82,10 +82,10 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
 
-    // Sorted pinned messages by chat history (oldest first, like in chat)
+    // Sorted pinned messages: newest first (like Telegram pinned banner)
     const sortedPinnedMessages = (() => {
         const pinned = messages.filter((m) => pinnedMessageIds.has(m.id));
-        pinned.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        pinned.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         return pinned;
     })();
 
@@ -96,7 +96,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
     // Reset banner index when pinned set changes (by IDs, not just size)
     useEffect(() => {
-        setPinnedBannerIdx(sortedPinnedMessages.length > 0 ? sortedPinnedMessages.length - 1 : 0);
+        setPinnedBannerIdx(0);
     }, [pinnedMessageIds.size, pinnedMessageIds]);
 
     useEffect(() => {
@@ -124,13 +124,13 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         if (pinned) handleScrollToMessage(pinned.id);
     };
 
-    // Banner click: scroll to current pinned message, then advance to next
+    // Banner click: scroll to current pinned, then advance (newest→oldest)
     const handlePinnedBannerClick = () => {
         if (sortedPinnedMessages.length === 0) return;
         hapticImpact('light');
         const target = sortedPinnedMessages[pinnedBannerIdx];
         if (target) handleScrollToMessage(target.id);
-        // Advance to next (wrap around)
+        // Advance toward older messages (wrap around)
         setPinnedBannerIdx((prev) => (prev + 1) % sortedPinnedMessages.length);
     };
 
