@@ -94,15 +94,14 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     hints: ['client-device'],
   } as any;
 
-  // Only add authenticatorSelection if present (without authenticatorAttachment)
-  if (optionsJSON.authenticatorSelection) {
-    const sel = optionsJSON.authenticatorSelection;
-    publicKey.authenticatorSelection = {
-      userVerification: sel.userVerification ?? 'preferred',
-      residentKey: sel.residentKey ?? 'preferred',
-    };
-    // Do NOT set authenticatorAttachment — this causes NFC/USB prompts on Android
-  }
+  // Always set authenticatorSelection with platform attachment.
+  // Without authenticatorAttachment: 'platform', Chrome shows the cross-platform
+  // chooser (NFC/USB/other device) instead of the fingerprint dialog.
+  publicKey.authenticatorSelection = {
+    authenticatorAttachment: 'platform',
+    userVerification: optionsJSON.authenticatorSelection?.userVerification as any ?? 'preferred',
+    residentKey: optionsJSON.authenticatorSelection?.residentKey as any ?? 'preferred',
+  };
 
   // Add excludeCredentials if present
   if (optionsJSON.excludeCredentials?.length) {
