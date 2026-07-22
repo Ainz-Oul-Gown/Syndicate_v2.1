@@ -57,7 +57,10 @@ serve(async (req) => {
       attestationType: 'none',
       excludeCredentials,
       authenticatorSelection: {
-        authenticatorAttachment: 'platform',
+        // Do NOT set authenticatorAttachment.
+        // On Android Chrome, 'platform' causes "credential manager" errors.
+        // Without it, Android Chrome defaults to the platform authenticator (fingerprint)
+        // while still allowing USB/NFC as fallback — same behavior as the reference project.
         residentKey: 'preferred',
         userVerification: 'preferred',
       },

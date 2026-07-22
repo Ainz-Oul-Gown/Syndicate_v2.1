@@ -382,14 +382,15 @@ hapticImpact("selection");
           } catch (e1: any) {
             console.warn('WebAuthn registration with server options failed, trying with explicit platform fallback...', e1);
             try {
-              // Fallback: explicitly set platform authenticator with safe defaults
-              const platformOptions = JSON.parse(JSON.stringify(options));
-              if (platformOptions.authenticatorSelection) {
-                platformOptions.authenticatorSelection.authenticatorAttachment = 'platform';
-                platformOptions.authenticatorSelection.residentKey = 'preferred';
-                platformOptions.authenticatorSelection.userVerification = 'preferred';
+              // Fallback: ensure safe defaults without authenticatorAttachment
+              // (authenticatorAttachment: 'platform' causes "credential manager" errors on Android)
+              const fallbackOptions = JSON.parse(JSON.stringify(options));
+              if (fallbackOptions.authenticatorSelection) {
+                delete fallbackOptions.authenticatorSelection.authenticatorAttachment;
+                fallbackOptions.authenticatorSelection.residentKey = 'preferred';
+                fallbackOptions.authenticatorSelection.userVerification = 'preferred';
               }
-              attResp = await startRegistration({ optionsJSON: platformOptions });
+              attResp = await startRegistration({ optionsJSON: fallbackOptions });
             } catch (e2: any) {
               throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или FaceID. Ошибка: ' + e2.message);
             }
