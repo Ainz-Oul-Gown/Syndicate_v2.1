@@ -79,6 +79,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(new Set());
     const [menuOpenUp, setMenuOpenUp] = useState(false);
     const [pinnedBannerIdx, setPinnedBannerIdx] = useState(0);
+    const pinnedScrollThrottleRef = useRef(false);
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
 
@@ -89,15 +90,16 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         return pinned;
     })();
 
-    // Current pinned message shown in banner
+    // Current pinned message shown in banner (clamped safely)
     const currentPinnedForBanner = sortedPinnedMessages.length > 0
         ? sortedPinnedMessages[Math.min(pinnedBannerIdx, sortedPinnedMessages.length - 1)]
         : null;
 
-    // Reset banner index when pinned set changes
+    // Reset banner index when pinned set changes (by IDs, not just size)
     useEffect(() => {
+        const idsKey = [...pinnedMessageIds].sort().join(',');
         setPinnedBannerIdx(sortedPinnedMessages.length > 0 ? sortedPinnedMessages.length - 1 : 0);
-    }, [pinnedMessageIds.size]);
+    }, [pinnedMessageIds.size, pinnedMessageIds]);
 
     useEffect(() => {
         try {
@@ -942,22 +944,34 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 setRenderLimit(prev => prev + 30);
             }
         }
-        // Update pinned banner based on visible pinned messages
-        if (sortedPinnedMessages.length > 1) {
-            const areaRect = area.getBoundingClientRect();
-            const thresholdY = areaRect.top + areaRect.height * 0.67; // 2/3 from top of visible area
-            // Walk from newest pinned to oldest; first one whose top is above threshold wins
-            for (let i = sortedPinnedMessages.length - 1; i >= 0; i--) {
-                const el = document.getElementById(`msg-${sortedPinnedMessages[i].id}`);
-                if (el) {
+        // Throttled: update pinned banner based on visible pinned messages
+        if (sortedPinnedMessages.length > 1 && !pinnedScrollThrottleRef.current) {
+            pinnedScrollThrottleRef.current = true;
+            requestAnimationFrame(() => {
+                const areaRect = area.getBoundingClientRect();
+                // Find the pinned message closest to the TOP of the visible area
+                // (the one the user is about to scroll past)
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                for (let i = 0; i < sortedPinnedMessages.length; i++) {
+                    const el = document.getElementById(`msg-${sortedPinnedMessages[i].id}`);
+                    if (!el) continue;
                     const elRect = el.getBoundingClientRect();
-                    // elRect.top < thresholdY means the message is in the upper 2/3 of the screen
-                    if (elRect.top < thresholdY && elRect.bottom > areaRect.top) {
-                        setPinnedBannerIdx(i);
-                        break;
+                    // Is this element visible in the viewport?
+                    if (elRect.bottom > areaRect.top && elRect.top < areaRect.bottom) {
+                        // Distance from the top of viewport — smaller = closer to top = should be shown
+                        const dist = elRect.top - areaRect.top;
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestIdx = i;
+                        }
                     }
                 }
-            }
+                if (bestIdx >= 0) {
+                    setPinnedBannerIdx(bestIdx);
+                }
+                pinnedScrollThrottleRef.current = false;
+            });
         }
     };
 
