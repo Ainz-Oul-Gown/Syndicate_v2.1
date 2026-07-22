@@ -52,7 +52,7 @@ serve(async (req) => {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const jwt = await new jose.SignJWT({ aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, session_version: Number(dbUser.session_version || 1), sub: dbUser.id })
+    const jwt = await new jose.SignJWT({ aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, auth_provider: 'seed', session_version: Number(dbUser.session_version || 1), sub: dbUser.id })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).setIssuedAt(now).setExpirationTime(now + 60 * 60 * 24 * 7)
       .sign(new TextEncoder().encode(JWT_SECRET));
 

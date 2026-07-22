@@ -425,7 +425,7 @@ hapticImpact("selection");
           const ecdsaKey = await idbKeyval.get<CryptoKey>(`my_sign_key_${userId}`);
 
           let localVault = null;
-          const simulatedSeed = `passkey security node ${userName.trim().toLowerCase()} ${userId}`;
+          const simulatedSeed = `passkey security node ${userName.trim().toLowerCase()} ${crypto.randomUUID()}`;
           const aesKey = await deriveAesKeyFromSeed(simulatedSeed);
 
           if (rsaKey && ecdsaKey) {

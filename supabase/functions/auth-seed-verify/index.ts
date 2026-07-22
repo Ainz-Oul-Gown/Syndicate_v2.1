@@ -101,7 +101,7 @@ serve(async (req) => {
 
     const now = Math.floor(Date.now() / 1000);
     const token = await new jose.SignJWT({
-      aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, session_version: Number(effectiveUser.session_version || 1), sub: effectiveUser.id,
+      aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, auth_provider: 'seed', session_version: Number(effectiveUser.session_version || 1), sub: effectiveUser.id,
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuedAt(now)

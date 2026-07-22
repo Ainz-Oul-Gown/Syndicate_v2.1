@@ -73,6 +73,11 @@ export default function PinScreen({
         const verifyRes = { json: async () => verifyData };
         
         const verification = await verifyRes.json();
+        if (verification.error && /заблокирован|blocked|deleted/i.test(verification.error)) {
+          localStorage.removeItem('synd_use_biometrics');
+          window.dispatchEvent(new CustomEvent('syndicate:session-expired'));
+          throw new Error(verification.error);
+        }
         if (!verification.verified) throw new Error('Verification failed');
       } else {
         // Never treat a missing local credential as a successful biometric check.
