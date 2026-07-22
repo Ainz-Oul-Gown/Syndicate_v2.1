@@ -80,8 +80,6 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const [menuOpenUp, setMenuOpenUp] = useState(false);
     const [pinnedBannerIdx, setPinnedBannerIdx] = useState(0);
     const pinnedScrollThrottleRef = useRef(false);
-    const pinnedUserNavRef = useRef(false); // true while user is manually navigating via banner clicks
-    const pinnedNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const pinnedMessagesStorageKey = `synd_pinned_messages_${currentUser.id}_${chat.id}`;
 
@@ -127,30 +125,18 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         if (pinned) handleScrollToMessage(pinned.id);
     };
 
-    // Banner click: advance index, then scroll. Blocks auto-detection during animation.
+    // Banner click: scroll to the NEXT pinned message (after current trigger).
+    // The scroll handler will naturally update pinnedBannerIdx when the scroll lands.
     const handlePinnedBannerClick = () => {
         if (sortedPinnedMessages.length === 0) return;
         hapticImpact('light');
 
-        // Block scroll-based auto-detection
-        pinnedUserNavRef.current = true;
-        if (pinnedNavTimerRef.current) clearTimeout(pinnedNavTimerRef.current);
-
-        // Advance to next pinned message
-        setPinnedBannerIdx((prev) => {
-            const next = (prev + 1) % sortedPinnedMessages.length;
-            // Scroll to the NEW current (after advance)
-            const target = sortedPinnedMessages[next];
-            if (target) {
-                setTimeout(() => handleScrollToMessage(target.id), 0);
-            }
-            return next;
-        });
-
-        // Re-enable auto-detection after scroll animation completes
-        pinnedNavTimerRef.current = setTimeout(() => {
-            pinnedUserNavRef.current = false;
-        }, 800);
+        // Find the next pinned message after the current banner index
+        const nextIdx = (pinnedBannerIdx + 1) % sortedPinnedMessages.length;
+        const target = sortedPinnedMessages[nextIdx];
+        if (target) {
+            handleScrollToMessage(target.id);
+        }
     };
 
     // Reply states
@@ -962,8 +948,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             }
         }
         // Throttled: update pinned banner based on visible pinned messages
-        // Skip if user is manually navigating via banner clicks
-        if (sortedPinnedMessages.length > 1 && !pinnedScrollThrottleRef.current && !pinnedUserNavRef.current) {
+        if (sortedPinnedMessages.length > 1 && !pinnedScrollThrottleRef.current) {
             pinnedScrollThrottleRef.current = true;
             requestAnimationFrame(() => {
                 const areaRect = area.getBoundingClientRect();
