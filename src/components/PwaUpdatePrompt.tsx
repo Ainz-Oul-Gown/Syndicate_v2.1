@@ -64,16 +64,26 @@ export default function PwaUpdatePrompt() {
     hapticImpact('warning');
 
     try {
-      // Clear all caches before updating
+      // Clear all caches
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map((name) => caches.delete(name)));
       }
-      await updateServiceWorker(true);
+
+      // Try to activate the service worker update
+      try {
+        await Promise.race([
+          updateServiceWorker(true),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 5000)),
+        ]);
+      } catch {
+        // If SW update fails or times out, do a hard reload
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Failed to activate the app update:', error);
-      setIsApplying(false);
       hapticImpact('error');
+      window.location.reload();
     }
   };
 
