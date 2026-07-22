@@ -967,8 +967,8 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                     }
                 }
                 if (crossedIdx >= 0 && crossedIdx < sortedPinnedMessages.length - 1) {
-                    // The message at crossedIdx went above middle → show the NEXT newer one
-                    setPinnedBannerIdx(crossedIdx + 1);
+                    // The message at crossedIdx went above middle → show IT in the banner
+                    setPinnedBannerIdx(crossedIdx);
                 } else if (crossedIdx < 0) {
                     // No pinned message crossed the middle yet → show the oldest (first visible)
                     setPinnedBannerIdx(0);
