@@ -78,6 +78,83 @@ export default function VoicePlayer({
     };
   }, []);
 
+  // Load audio without playing — used by scrub gesture
+  const loadAudioOnly = async (): Promise<boolean> => {
+    if (audioRef.current) return true;
+    setIsLoading(true);
+    try {
+      if (localUrl) {
+        const audio = new Audio(localUrl);
+        audioRef.current = audio;
+        audio.addEventListener('timeupdate', () => {
+          if (!audio.duration || isScrubbingRef.current) return;
+          setProgress(audio.currentTime / audio.duration);
+        });
+        audio.addEventListener('ended', () => {
+          setIsPlaying(false);
+          setProgress(0);
+        });
+        return true;
+      }
+
+      let arrayBuffer: ArrayBuffer;
+      const cache = await caches.open('syndicate-media-cache');
+      const cacheReq = new Request(`/voice/${fileName}`);
+      const cachedRes = await cache.match(cacheReq);
+
+      if (cachedRes) {
+        arrayBuffer = await cachedRes.arrayBuffer();
+      } else {
+        const { data, error } = await supabaseClient.storage.from('voice_messages').download(fileName);
+        if (error) throw error;
+        arrayBuffer = await data.arrayBuffer();
+        await cache.put(cacheReq, new Response(arrayBuffer));
+      }
+
+      if (!aesKey) throw new Error('No AES Key for decryption');
+
+      const bytes = new Uint8Array(arrayBuffer);
+      const iv = bytes.slice(0, 12);
+      const encryptedData = bytes.slice(12);
+
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        aesKey,
+        encryptedData
+      );
+
+      const audioBlob = new Blob([decryptedBuffer], { type: 'audio/ogg; codecs=opus' });
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioUrlRef.current = audioUrl;
+
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.addEventListener('timeupdate', () => {
+        if (!audio.duration || isScrubbingRef.current) return;
+        setProgress(audio.currentTime / audio.duration);
+      });
+
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setProgress(0);
+        if (globalCurrentAudio === audio) {
+          globalCurrentAudio = null;
+          globalCurrentSetPlaying = null;
+        }
+      });
+
+      return true;
+    } catch (e) {
+      console.error('Failed to load E2EE voice message', e);
+      hapticImpact("error");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handlePlayPause = async () => {
     if (isLoading) return;
 
@@ -210,11 +287,11 @@ hapticImpact("error");
     return pct;
   };
 
-  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = async (e: PointerEvent<HTMLDivElement>) => {
+    // If audio not loaded yet, load without playing, then enter scrub mode
     if (!audioRef.current) {
-      // Load audio on tap if not loaded yet, but don't start playback on scrub
-      handlePlayPause();
-      return;
+      const loaded = await loadAudioOnly();
+      if (!loaded || !audioRef.current) return;
     }
 
     setIsScrubbing(true);
