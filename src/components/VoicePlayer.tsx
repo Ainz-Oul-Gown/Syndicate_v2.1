@@ -287,44 +287,6 @@ hapticImpact("error");
     return pct;
   };
 
-  const handlePointerDown = async (e: PointerEvent<HTMLDivElement>) => {
-    // If audio not loaded yet, load without playing, then enter scrub mode
-    if (!audioRef.current) {
-      const loaded = await loadAudioOnly();
-      if (!loaded || !audioRef.current) return;
-    }
-
-    setIsScrubbing(true);
-    isScrubbingRef.current = true;
-    const startPct = updateScrubProgress(e.clientX);
-    let didMove = false;
-
-    hapticImpact("selection");
-
-    const handlePointerMove = (ev: globalThis.PointerEvent) => {
-      didMove = true;
-      updateScrubProgress(ev.clientX);
-    };
-
-    const handlePointerUp = (ev: globalThis.PointerEvent) => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-
-      // Only seek if the user actually dragged on the waveform
-      if (didMove && audioRef.current && audioRef.current.duration) {
-        const finalPct = updateScrubProgress(ev.clientX);
-        audioRef.current.currentTime = finalPct * audioRef.current.duration;
-      }
-      setIsScrubbing(false);
-      isScrubbingRef.current = false;
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-  };
-
   const handleManualTranscribe = async () => {
     if (!onTranscribe) return;
     setTranscribeLoading(true);
@@ -361,16 +323,48 @@ hapticImpact("error");
           )}
         </button>
 
-        {/* Waveform wrapper — stopPropagation prevents swipe-to-reply and context menu from triggering on the waveform */}
+        {/* Waveform wrapper — touch events for scrub, stopPropagation blocks swipe-to-reply */}
         <div
           ref={waveformRef}
-          onPointerDown={(e) => {
+          onTouchStart={(e) => {
             e.stopPropagation();
-            handlePointerDown(e);
+            const touch = e.touches[0];
+            // If audio not loaded, start loading but don't block gesture
+            if (!audioRef.current) {
+              loadAudioOnly().then(() => {
+                if (audioRef.current) {
+                  setIsScrubbing(true);
+                  isScrubbingRef.current = true;
+                  updateScrubProgress(touch.clientX);
+                  hapticImpact("selection");
+                }
+              });
+              // Still enter visual scrub mode immediately
+              setIsScrubbing(true);
+              isScrubbingRef.current = true;
+              updateScrubProgress(touch.clientX);
+              return;
+            }
+            setIsScrubbing(true);
+            isScrubbingRef.current = true;
+            updateScrubProgress(touch.clientX);
+            hapticImpact("selection");
           }}
-          onTouchStart={(e) => e.stopPropagation()}
-          onTouchMove={(e) => e.stopPropagation()}
-          onTouchEnd={(e) => e.stopPropagation()}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+            if (isScrubbingRef.current) {
+              updateScrubProgress(e.touches[0].clientX);
+            }
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            if (isScrubbingRef.current && audioRef.current && audioRef.current.duration) {
+              const pct = updateScrubProgress(e.changedTouches[0].clientX);
+              audioRef.current.currentTime = pct * audioRef.current.duration;
+            }
+            setIsScrubbing(false);
+            isScrubbingRef.current = false;
+          }}
           onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-[3px] flex-grow h-8 cursor-pointer touch-manipulation"
         >
