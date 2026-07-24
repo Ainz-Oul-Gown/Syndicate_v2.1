@@ -1861,7 +1861,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 onScrollToBottom={handleScrollToBottom}
                 onTogglePin={toggleMessagePin}
                 onDelete={handleDeleteMessage}
-                onReply={(msg) => setReplyTo({ id: msg.id, name: msg.isMine ? 'Я' : getSenderName(msg.sender_id), text: msg.text })}
+                onReply={(msg) => setReplyTo({ id: msg.id, name: msg.name, text: msg.text })}
                 onScrollToMessage={handleScrollToMessage}
                 onMenuStateChange={setActiveMessageMenu}
                 onMenuDirectionChange={setMenuOpenUp}
