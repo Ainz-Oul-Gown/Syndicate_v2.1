@@ -3,6 +3,13 @@ import type { RefObject } from 'react';
 import { Loader2, ArrowDown } from 'lucide-react';
 import { DecryptedMessage } from '../../types';
 import MessageBubble from './MessageBubble';
+import DateSeparator from './DateSeparator';
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
 
 export interface MessageListProps {
   messages: DecryptedMessage[];
@@ -87,39 +94,44 @@ export default function MessageList({
           </div>
         ) : (
           <>
-            {messages
-              .slice()
-              .reverse()
-              .slice(0, renderLimit)
-              .map((m) => {
+            {(() => {
+              const displayed = messages.slice().reverse().slice(0, renderLimit);
+              return displayed.map((m, idx) => {
                 const isSwiping = swipingMsgId === m.id;
+                const msgDate = new Date(m.created_at);
+                const prevMsg = idx > 0 ? displayed[idx - 1] : null;
+                const showDate = !prevMsg || !sameDay(new Date(prevMsg.created_at), msgDate);
+
                 return (
-                  <MessageBubble
-                    key={m.id}
-                    message={m}
-                    isGroup={isGroup}
-                    getSenderName={getSenderName}
-                    pinnedMessageIds={pinnedMessageIds}
-                    activeMessageMenu={activeMessageMenu}
-                    menuOpenUp={menuOpenUp}
-                    swipeOffset={swipeOffset}
-                    isSwiping={isSwiping}
-                    onTogglePin={onTogglePin}
-                    onDelete={onDelete}
-                    onReply={onReply}
-                    onScrollToMessage={onScrollToMessage}
-                    onMenuStateChange={onMenuStateChange}
-                    onMenuDirectionChange={onMenuDirectionChange}
-                    onSwipeStart={onSwipeStart}
-                    onSwipeMove={onSwipeMove}
-                    chatKey={chatKey}
-                    onManualTranscribe={onManualTranscribe}
-                    onRetry={onRetry}
-                    isRetryingFailed={isRetryingFailed}
-                    online={online}
-                  />
+                  <div key={m.id}>
+                    {showDate && <DateSeparator date={msgDate} />}
+                    <MessageBubble
+                      message={m}
+                      isGroup={isGroup}
+                      getSenderName={getSenderName}
+                      pinnedMessageIds={pinnedMessageIds}
+                      activeMessageMenu={activeMessageMenu}
+                      menuOpenUp={menuOpenUp}
+                      swipeOffset={swipeOffset}
+                      isSwiping={isSwiping}
+                      onTogglePin={onTogglePin}
+                      onDelete={onDelete}
+                      onReply={onReply}
+                      onScrollToMessage={onScrollToMessage}
+                      onMenuStateChange={onMenuStateChange}
+                      onMenuDirectionChange={onMenuDirectionChange}
+                      onSwipeStart={onSwipeStart}
+                      onSwipeMove={onSwipeMove}
+                      chatKey={chatKey}
+                      onManualTranscribe={onManualTranscribe}
+                      onRetry={onRetry}
+                      isRetryingFailed={isRetryingFailed}
+                      online={online}
+                    />
+                  </div>
                 );
-              })}
+              });
+            })()}
             {hasMoreInHistory && renderLimit >= messages.length && (
               <button
                 type="button"
