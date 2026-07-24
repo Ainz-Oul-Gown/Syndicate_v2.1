@@ -9,6 +9,7 @@ import {
   Pause,
   Loader2,
   Check,
+  CheckCheck,
   Mic,
   UserPlus,
 } from 'lucide-react';
@@ -205,6 +206,15 @@ export default function MessageBubble({
           <span>{timeStr}</span>
           {message.deliveryStatus === 'sending' && <span> · отправка…</span>}
           {message.deliveryStatus === 'failed' && <span> · не отправлено</span>}
+          {message.isMine && message.deliveryStatus === 'read' && (
+            <span
+              className="inline-flex items-center ml-1 align-[-2px] text-emerald-400"
+              title="Прочитано"
+              aria-label="Сообщение прочитано"
+            >
+              <CheckCheck className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
+            </span>
+          )}
           {message.isMine && message.deliveryStatus === 'sent' && (
             <span
               className="inline-flex items-center ml-1 align-[-2px] text-sky-300"

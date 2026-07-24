@@ -35,6 +35,7 @@ export interface Message {
   encrypted_text: string;
   encrypted_vector?: string | null;
   created_at: string;
+  read_at?: string | null;
 }
 
 export interface Currency {
@@ -95,7 +96,7 @@ export interface DecryptedMessage {
   reply?: ReplyData;
   isAuthentic: boolean;
   isError: boolean;
-  deliveryStatus?: 'sending' | 'failed' | 'sent';
+  deliveryStatus?: 'sending' | 'failed' | 'sent' | 'read';
   retryPayload?:
     | { kind: 'text'; text: string; reply?: ReplyData | null }
     | { kind: 'voice'; blob: Blob; waveform: string; reply?: ReplyData | null; localUrl?: string };

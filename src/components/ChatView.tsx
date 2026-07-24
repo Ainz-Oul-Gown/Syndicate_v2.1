@@ -351,6 +351,11 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         const voiceData = decrypted.text.startsWith('[VOICE]:') ? parseVoicePayload(decrypted.text) : undefined;
         const inviteData = decrypted.text.startsWith('[GROUP_INVITE]:') ? parseInvitePayload(decrypted.text) : undefined;
 
+        let deliveryStatus: DecryptedMessage['deliveryStatus'];
+        if (isMine) {
+            deliveryStatus = msg.read_at ? 'read' : 'sent';
+        }
+
         return {
             id: msg.id,
             sender_id: msg.sender_id,
@@ -363,8 +368,17 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             isError: decrypted.isError,
             voiceData,
             inviteData,
-            deliveryStatus: isMine ? 'sent' : undefined,
+            deliveryStatus,
         };
+    };
+
+    // Mark all incoming messages in this chat as read (server-side).
+    const markMessagesRead = async () => {
+        try {
+            await supabaseClient.rpc('mark_messages_read', { p_chat_id: chat.id });
+        } catch (e) {
+            console.warn('mark_messages_read failed', e);
+        }
     };
 
     const parseVoicePayload = (text: string) => {
@@ -537,7 +551,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             // window (instead of only newer rows) also removes messages deleted on another device.
             const { data: serverRows, error } = await supabaseClient
                 .from('messages')
-                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at')
+                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at, read_at')
                 .eq('chat_id', chat.id)
                 .order('created_at', { ascending: false })
                 .limit(500);
@@ -581,7 +595,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         try {
             const { data, error } = await supabaseClient
                 .from('messages')
-                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at')
+                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at, read_at')
                 .eq('chat_id', chat.id)
                 .lt('created_at', oldestServerCursor)
                 .order('created_at', { ascending: false })
@@ -631,6 +645,11 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     useEffect(() => {
         if (chatKey) {
             loadHistory(chatKey);
+
+            // Mark incoming messages as read on the server.
+            // The resulting UPDATE events will be picked up by the Realtime
+            // subscription below, so senders will see double-checkmarks.
+            void markMessagesRead();
 
             // Subscribe to real-time additions
             let disposed = false;
@@ -822,7 +841,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                     encrypted_text: encryptedPayload,
                     encrypted_vector: encryptedVector,
                 })
-                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at')
+                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at, read_at')
                 .single();
             if (insertError) throw insertError;
 
@@ -1127,7 +1146,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                     sender_id: currentUser.id,
                     encrypted_text: encryptedText,
                 })
-                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at')
+                .select('id, chat_id, sender_id, encrypted_text, encrypted_vector, created_at, read_at')
                 .single();
 
             if (insertError) throw insertError;
