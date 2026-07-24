@@ -45,6 +45,7 @@ export default function VoicePlayer({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
+  const isScrubbingRef = useRef(false);
 
   // Parse waveform data
   const bars = useRef<number[]>([]);
@@ -111,7 +112,7 @@ export default function VoicePlayer({
         const audio = new Audio(localUrl);
         audioRef.current = audio;
         audio.addEventListener('timeupdate', () => {
-          if (!audio.duration || isScrubbing) return;
+          if (!audio.duration || isScrubbingRef.current) return;
           setProgress(audio.currentTime / audio.duration);
         });
         audio.addEventListener('ended', () => {
@@ -169,7 +170,7 @@ export default function VoicePlayer({
       audioRef.current = audio;
 
       audio.addEventListener('timeupdate', () => {
-        if (!audio.duration || isScrubbing) return;
+        if (!audio.duration || isScrubbingRef.current) return;
         setProgress(audio.currentTime / audio.duration);
       });
 
@@ -211,12 +212,13 @@ hapticImpact("error");
 
   const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (!audioRef.current) {
-      // Load and play on tap if not loaded yet
+      // Load audio on tap if not loaded yet, but don't start playback on scrub
       handlePlayPause();
       return;
     }
 
     setIsScrubbing(true);
+    isScrubbingRef.current = true;
     const pct = updateScrubProgress(e.clientX);
 
     hapticImpact("selection");
@@ -235,6 +237,7 @@ hapticImpact("error");
         audioRef.current.currentTime = finalPct * audioRef.current.duration;
       }
       setIsScrubbing(false);
+      isScrubbingRef.current = false;
     };
 
     window.addEventListener('pointermove', handlePointerMove);

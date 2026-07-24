@@ -25,6 +25,7 @@ export interface MessageComposerProps {
   onResumeRecording: () => void;
   onCancelRecording: () => void;
   onPlayPreview: () => void;
+  onMicTouchMove: (e: TouchEvent) => void;
   failedMessageCount: number;
   isRetryingFailed: boolean;
   online: boolean;
@@ -54,6 +55,7 @@ export default function MessageComposer({
   onResumeRecording,
   onCancelRecording,
   onPlayPreview,
+  onMicTouchMove,
   failedMessageCount,
   isRetryingFailed,
   online,
@@ -224,7 +226,7 @@ export default function MessageComposer({
             onTouchStart={onStartRecording as any}
             onMouseUp={onStopRecording}
             onTouchEnd={onStopRecording}
-            onTouchMove={(e: any) => {}}
+            onTouchMove={onMicTouchMove as any}
             onMouseMove={(e: any) => {}}
             style={{ transform: 'scale(' + micPulseScale + ')' }}
             className={'w-11 h-11 rounded-full border text-slate-300 flex items-center justify-center transition shadow-lg focus:outline-none touch-none select-none z-30 flex-shrink-0 ' + (isRecording ? 'bg-red-500 border-red-500 text-white shadow-red-500/20' : 'bg-slate-900 border-slate-800 active:bg-slate-800')}

@@ -124,6 +124,9 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     const swipingMsgId = useRef<string | null>(null);
     const [swipeOffset, setSwipeOffset] = useState<number>(0);
 
+    // Ref to track recording gesture independently of async state
+    const recordingGestureActive = useRef(false);
+
     // Recording states
     const [isRecording, setIsRecording] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
@@ -973,6 +976,9 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
             touchStartY.current = e.touches[0].clientY;
         }
 
+        // Mark gesture active synchronously (before any async work)
+        recordingGestureActive.current = true;
+
         try {
             if (!globalAudioStream) {
                 globalAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1267,6 +1273,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     };
 
     const stopRecordingAndSend = () => {
+        recordingGestureActive.current = false;
         if (isRecordLocked && !isRecordPaused) return; // if locked and not paused, do nothing on mouse up
         if (mediaRecorderRef.current && (isRecording || isRecordPaused)) {
             mediaRecorderRef.current.stop();
@@ -1314,6 +1321,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     };
 
     const cancelRecording = () => {
+        recordingGestureActive.current = false;
         hapticImpact("warning");
         audioChunksRef.current = [];
         if (mediaRecorderRef.current && isRecording) {
@@ -1401,7 +1409,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
     };
 
     const handleMicTouchMove = (e: TouchEvent | any) => {
-        if (!isRecording || isRecordLocked) return;
+        if (!recordingGestureActive.current || isRecordLocked) return;
         const deltaX = e.touches[0].clientX - touchStartX.current;
         const deltaY = e.touches[0].clientY - touchStartY.current;
 
@@ -1895,6 +1903,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 onResumeRecording={resumeRecording}
                 onCancelRecording={cancelRecording}
                 onPlayPreview={togglePreviewPlay}
+                onMicTouchMove={handleMicTouchMove}
                 failedMessageCount={failedMessageCount}
                 isRetryingFailed={isRetryingFailed}
                 online={online}
