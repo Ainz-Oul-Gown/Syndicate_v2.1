@@ -81,6 +81,8 @@ export default function MessageBubble({
     <div
       id={'msg-' + message.id}
       onTouchStart={(e) => {
+        // Skip swipe-to-reply if touch is on voice waveform (scrub area)
+        if ((e.target as HTMLElement)?.closest?.('[data-voice-waveform]')) return;
         const touch = e.touches[0];
         (bubbleRef.current as any).__touchStartX = touch.clientX;
         (bubbleRef.current as any).__touchStartY = touch.clientY;
@@ -88,6 +90,7 @@ export default function MessageBubble({
         onSwipeStart?.(message.id);
       }}
       onTouchMove={(e) => {
+        if ((e.target as HTMLElement)?.closest?.('[data-voice-waveform]')) return;
         const touch = e.touches[0];
         const startX = (bubbleRef.current as any).__touchStartX ?? touch.clientX;
         const startY = (bubbleRef.current as any).__touchStartY ?? touch.clientY;
@@ -104,7 +107,8 @@ export default function MessageBubble({
           }
         }
       }}
-      onTouchEnd={() => {
+      onTouchEnd={(e) => {
+        if ((e.target as HTMLElement)?.closest?.('[data-voice-waveform]')) return;
         (bubbleRef.current as any).__swipingMsgId = null;
         onSwipeMove?.(message.id, 0);
       }}
@@ -117,6 +121,7 @@ export default function MessageBubble({
           transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
         }}
         onClick={(e) => {
+          if ((e.target as HTMLElement)?.closest?.('[data-voice-waveform]')) return;
           e.stopPropagation();
           if (activeMessageMenu === message.id) {
             onMenuStateChange(null);

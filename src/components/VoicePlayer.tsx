@@ -326,6 +326,7 @@ hapticImpact("error");
         {/* Waveform wrapper — touch events for scrub, stopPropagation blocks swipe-to-reply */}
         <div
           ref={waveformRef}
+          data-voice-waveform="1"
           onTouchStart={(e) => {
             e.stopPropagation();
             const touch = e.touches[0];
