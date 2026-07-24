@@ -1,16 +1,36 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 build/
 dist/
 coverage/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
+npm-debug.log*
 
-# Environment variables and secrets
-
+# Environment variables
 .env
 .env.*
-.env.example
+.env.local
+.env.*.local
 
-# Supabase CLI temporary files
-
+# Supabase
 supabase/.temp/
+
+# Vite
+.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+*.local

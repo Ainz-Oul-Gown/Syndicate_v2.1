@@ -1,34 +1,6 @@
 import { hapticImpact } from "../lib/haptics";
 import { useState, useEffect, useRef, FormEvent, UIEvent, TouchEvent, MouseEvent } from 'react';
-import {
-    ChevronLeft,
-    Search,
-    Wallet,
-    MoreVertical,
-    Mic,
-    Send,
-    X,
-    Trash2,
-    Play,
-    Pause,
-    ArrowDown,
-    UserMinus,
-    UserPlus,
-    Edit2,
-    Trash,
-    LogOut,
-    HelpCircle,
-    Loader2,
-    Check,
-    Shield,
-    Plus,
-    History,
-    Calendar,
-    AlertTriangle,
-    Pin,
-    PinOff,
-    Reply,
-} from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import * as idbKeyval from 'idb-keyval';
 import { decryptChatDraft, emitDraftChanged, encryptChatDraft, getDraftStorageKey, type EncryptedChatDraft } from '../lib/drafts';
 import { supabaseClient } from '../lib/supabase';
@@ -41,11 +13,19 @@ import {
     getFingerprint,
 } from '../lib/crypto';
 import { Chat, DecryptedMessage, Message, User, Currency, Debt, ReplyData } from '../types';
-import VoicePlayer from './VoicePlayer';
 import DeepSearch from './DeepSearch';
 import { getCachedEmbeddingPipeline } from '../lib/ai';
 import { isOnline, NETWORK_STATE_EVENT, type NetworkStateDetail } from '../lib/network';
 import { notify } from '../lib/notifications';
+import ChatHeader from './chat/ChatHeader';
+import ChatPinnedBanner from './chat/ChatPinnedBanner';
+import MessageList from './chat/MessageList';
+import MessageComposer from './chat/MessageComposer';
+import ChatInfoScreen from './chat/ChatInfoScreen';
+import NameHistoryModal from './chat/NameHistoryModal';
+import DebtsPanel from './chat/DebtsPanel';
+import AddDebtScreen from './chat/AddDebtScreen';
+import InviteFriendScreen from './chat/InviteFriendScreen';
 
 interface ChatViewProps {
     chat: Chat;
@@ -1348,6 +1328,17 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
         }
     };
 
+    const togglePreviewPlay = () => {
+        if (!previewAudioRef.current) return;
+        if (isRecordPlaying) {
+            previewAudioRef.current.pause();
+            setIsRecordPlaying(false);
+        } else {
+            previewAudioRef.current.play();
+            setIsRecordPlaying(true);
+        }
+    };
+
     // Swipe-to-reply gesture handlers
     const handleTouchStart = (e: any, msgId: string) => {
         touchStartX.current = e.touches[0].clientX;
@@ -1813,736 +1804,114 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
     return (
         <div ref={viewportShellRef} className="chat-viewport-shell flex-1 min-h-0 w-full flex flex-col bg-slate-950 relative select-none animate-fade-in text-slate-100">
-            {/* Top Header info */}
-            <div className="flex items-center justify-between border-b border-slate-900 pb-3 p-4 bg-slate-900/40 relative z-10 flex-shrink-0">
-                <button
-                    onClick={onBack}
-                    className="text-primary hover:text-primary-hover font-medium flex items-center focus:outline-none"
-                >
-                    <ChevronLeft className="w-6 h-6" />
-                </button>
-
-                <div
-                    onClick={() => setActiveModal('info')}
-                    className="flex flex-col items-center justify-center text-center cursor-pointer flex-grow mx-4 overflow-hidden"
-                >
-                    <span className="font-semibold text-slate-200 text-base truncate max-w-full">
-                        {isGroup ? groupName : chat.name}
-                    </span>
-                    <span className="text-xs text-emerald-500 font-mono truncate max-w-full">
-                        {chatFingerprint}
-                    </span>
-                </div>
-
-                <div className="flex gap-2.5">
-                    {chat.type === 'private' && (
-                        <button
-                            onClick={() => setActiveModal('debts')}
-                            className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-primary hover:text-primary-hover active:scale-95 transition focus:outline-none"
-                        >
-                            <Wallet className="w-4.5 h-4.5" />
-                        </button>
-                    )}
-                    <button
-                        onClick={() => setActiveModal('search')}
-                        className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-primary hover:text-primary-hover active:scale-95 transition focus:outline-none"
-                    >
-                        <Search className="w-4.5 h-4.5" />
-                    </button>
-                </div>
-            </div>
-
-            {/* Pinned message banner - full width below header */}
+            <ChatHeader
+                chat={chat}
+                chatFingerprint={chatFingerprint}
+                groupName={groupName}
+                isGroup={isGroup}
+                onBack={onBack}
+                onOpenInfo={() => setActiveModal('info')}
+                onOpenSearch={() => setActiveModal('search')}
+                onOpenDebts={() => setActiveModal('debts')}
+            />
             {currentPinnedForBanner && (
-                <div
+                <ChatPinnedBanner
+                    message={currentPinnedForBanner}
+                    index={pinnedBannerIdx}
+                    total={sortedPinnedMessages.length}
                     onClick={handlePinnedBannerClick}
-                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-primary/8 border-b border-primary/20 cursor-pointer hover:bg-primary/12 active:bg-primary/15 transition-all"
-                >
-                    <Pin className="w-3.5 h-3.5 text-primary fill-primary shrink-0" />
-                    <span className="text-xs text-primary/80 truncate flex-1 font-medium">
-                        {currentPinnedForBanner?.text || '🔗 Голосовое сообщение / вложение'}
-                    </span>
-                    {sortedPinnedMessages.length > 1 && (
-                        <span className="text-[10px] text-primary/50 font-mono shrink-0">
-                            {pinnedBannerIdx + 1}/{sortedPinnedMessages.length}
-                        </span>
-                    )}
-                </div>
+                />
             )}
 
-            {/* Messages area in reverse layout */}
-            <div className="chat-container flex-grow overflow-hidden relative">
-                <div
-                    ref={messagesAreaRef}
-                    onScroll={handleScroll}
-                    onClick={() => setActiveMessageMenu(null)}
-                    className="messages-area h-full overflow-y-auto p-4 flex flex-col-reverse gap-3.5 select-text"
-                >
-                    {isLoadingChat ? (
-                        <div className="flex flex-col gap-4 opacity-50 pointer-events-none w-full">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                                <div key={i} className={`flex w-full ${i % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`w-2/3 h-16 rounded-2xl animate-pulse ${i % 2 === 0 ? 'bg-primary/20' : 'bg-slate-800'}`} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <>
-                            {messages
-                                .slice()
-                                .reverse()
-                                .slice(0, renderLimit)
-                                .map((m) => {
-                                    const msgDate = new Date(m.created_at);
-                                    const timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                    const isSwiping = swipingMsgId.current === m.id;
+            <MessageList
+                messages={messages}
+                isLoadingChat={isLoadingChat}
+                hasMoreInHistory={hasMoreInHistory}
+                isLoadingOlder={isLoadingOlder}
+                renderLimit={renderLimit}
+                showScrollBottom={showScrollBottom}
+                isGroup={isGroup}
+                chatKey={chatKey}
+                getSenderName={getSenderName}
+                pinnedMessageIds={pinnedMessageIds}
+                activeMessageMenu={activeMessageMenu}
+                menuOpenUp={menuOpenUp}
+                swipeOffset={swipeOffset}
+                swipingMsgId={swipingMsgId.current}
+                onLoadOlder={loadOlderMessages}
+                onScrollToBottom={handleScrollToBottom}
+                onTogglePin={toggleMessagePin}
+                onDelete={handleDeleteMessage}
+                onReply={(msg) => setReplyTo({ id: msg.id, name: msg.isMine ? 'Я' : getSenderName(msg.sender_id), text: msg.text })}
+                onScrollToMessage={handleScrollToMessage}
+                onMenuStateChange={setActiveMessageMenu}
+                onMenuDirectionChange={setMenuOpenUp}
+                onManualTranscribe={handleManualTranscribe}
+                onRetry={retryMessage}
+                isRetryingFailed={isRetryingFailed}
+                online={online}
+                messagesAreaRef={messagesAreaRef}
+                onScroll={handleScroll}
+            />
 
-                                    return (
-                                        <div
-                                            key={m.id}
-                                            id={`msg-${m.id}`}
-                                            onTouchStart={(e) => handleTouchStart(e, m.id)}
-                                            onTouchMove={(e) => handleTouchMove(e, m.id)}
-                                            onTouchEnd={handleTouchEnd}
-                                            className={`flex w-full relative ${m.isMine ? 'justify-end' : 'justify-start'}`}
-                                        >
-                                            <div
-                                                style={{
-                                                    transform: isSwiping ? `translateX(${swipeOffset}px)` : 'translateX(0px)',
-                                                    transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
-                                                }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (activeMessageMenu === m.id) {
-                                                        setActiveMessageMenu(null);
-                                                    } else {
-                                                        // Determine if menu should open upward (near bottom of chat)
-                                                        const msgEl = e.currentTarget as HTMLElement;
-                                                        const areaEl = messagesAreaRef.current;
-                                                        if (areaEl && msgEl) {
-                                                            const areaRect = areaEl.getBoundingClientRect();
-                                                            const msgRect = msgEl.getBoundingClientRect();
-                                                            const distFromBottom = areaRect.bottom - msgRect.bottom;
-                                                            setMenuOpenUp(distFromBottom < 120);
-                                                        } else {
-                                                            setMenuOpenUp(false);
-                                                        }
-                                                        setActiveMessageMenu(m.id);
-                                                    }
-                                                }}
-                                                className={`msg-bubble flex flex-col px-4 py-3 relative max-w-[85%] break-words overflow-hidden ${m.isMine
-                                                        ? 'msg-mine bg-primary text-white rounded-[18px] rounded-br-[4px] shadow-md shadow-primary/10'
-                                                        : 'msg-other bg-slate-900 border border-slate-850 text-slate-100 rounded-[18px] rounded-bl-[4px]'
-                                                    }`}
-                                            >
-                                                {pinnedMessageIds.has(m.id) && (
-                                                    <div className={`mb-1 flex items-center gap-1 text-[10px] font-semibold ${m.isMine ? 'text-white/70' : 'text-primary'}`}>
-                                                        <Pin className="w-3 h-3 fill-current" /> Закреплено
-                                                    </div>
-                                                )}
+            <MessageComposer
+                inputText={inputText}
+                onInputChange={handleInputChange}
+                onSend={handleSendMessage}
+                replyTo={replyTo}
+                onClearReply={() => setReplyTo(null)}
+                isRecording={isRecording}
+                recordingDuration={recordingDuration}
+                isRecordLocked={isRecordLocked}
+                isRecordPaused={isRecordPaused}
+                recordPreviewUrl={recordPreviewUrl}
+                isRecordPlaying={isRecordPlaying}
+                recordPreviewProgress={recordPreviewProgress}
+                recordWaveHistory={recordWaveHistory}
+                micPulseScale={micPulseScale}
+                onStartRecording={startRecording}
+                onStopRecording={stopRecordingAndSend}
+                onForceStop={forceStopRecordingAndSend}
+                onPauseRecording={pauseRecording}
+                onResumeRecording={resumeRecording}
+                onCancelRecording={cancelRecording}
+                onPlayPreview={togglePreviewPlay}
+                failedMessageCount={failedMessageCount}
+                isRetryingFailed={isRetryingFailed}
+                online={online}
+                onRetryAll={retryAllFailedMessages}
+                inputRef={inputRef}
+            />
 
-                                                {/* Sender Name in group */}
-                                                {isGroup && !m.isMine && (
-                                                    <div className="sender-name text-xs font-bold text-primary mb-1">
-                                                        {getSenderName(m.sender_id)}
-                                                    </div>
-                                                )}
-
-                                                {/* Reply block wrapper */}
-                                                {m.reply && (
-                                                    <div
-                                                        onClick={() => handleScrollToMessage(m.reply!.id)}
-                                                        className={`msg-reply-block cursor-pointer border-l-2 p-1.5 rounded mb-2.5 text-xs ${m.isMine
-                                                                ? 'bg-white/10 border-white text-white/95'
-                                                                : 'bg-black/10 border-primary text-slate-300'
-                                                            }`}
-                                                    >
-                                                        <div className="font-bold mb-0.5">{m.reply.name}</div>
-                                                        <div className="truncate">{m.reply.text}</div>
-                                                    </div>
-                                                )}
-
-                                                {/* Message main bodies */}
-                                                {m.voiceData ? (
-                                                    <VoicePlayer
-                                                        fileName={m.voiceData.fileName}
-                                                        waveformString={m.voiceData.waveform.join(',')}
-                                                        aesKey={chatKey}
-                                                        transcription={m.voiceData.transcription}
-                                                        isProcessing={m.voiceData.isProcessing}
-                                                        isError={m.voiceData.isError}
-                                                        hasTranscript={m.voiceData.hasTranscript}
-                                                        msgId={m.id}
-                                                        onTranscribe={handleManualTranscribe}
-                                                        isMine={m.isMine}
-                                                        localUrl={m.voiceData.localUrl}
-                                                    />
-                                                ) : m.inviteData ? (
-                                                    <div className="flex flex-col gap-3 p-2 bg-black/15 rounded-xl border border-white/5">
-                                                        <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
-                                                            Приглашение в группу
-                                                        </span>
-                                                        <span className="font-bold text-base text-slate-100">{m.inviteData.groupName}</span>
-                                                        {!m.isMine && (
-                                                            <button
-                                                                onClick={() => handleAcceptGroupInvite(m.inviteData!.groupId, m.inviteData!.keysJSON)}
-                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition"
-                                                            >
-                                                                Вступить в группу
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ) : m.isError ? (
-                                                    <span className="text-rose-300 flex items-center gap-1.5 italic text-sm">
-                                                        <Shield className="w-4 h-4 text-rose-500 flex-shrink-0" /> {m.text}
-                                                    </span>
-                                                ) : !m.isAuthentic ? (
-                                                    <span className="text-rose-300 flex items-center gap-1.5 italic text-sm font-semibold">
-                                                        <Shield className="w-4 h-4 text-rose-500 flex-shrink-0 animate-bounce" /> [ОТКЛОНЕНО: Подпись подделана!]
-                                                    </span>
-                                                ) : (
-                                                    <div className="whitespace-pre-wrap select-text text-sm leading-relaxed">{m.text}</div>
-                                                )}
-
-                                                {/* Timestamps */}
-                                                <span
-                                                    className={`text-[10px] text-right mt-1 w-full block tracking-wide select-none ${m.isMine ? 'text-white/60' : 'text-slate-500'
-                                                        }`}
-                                                >
-                                                    <span>{timeStr}</span>
-                                                    {m.deliveryStatus === 'sending' && <span> · отправка…</span>}
-                                                    {m.deliveryStatus === 'failed' && <span> · не отправлено</span>}
-                                                    {m.isMine && m.deliveryStatus === 'sent' && (
-                                                        <span
-                                                            className="inline-flex items-center ml-1 align-[-2px] text-sky-300"
-                                                            title="Принято сервером"
-                                                            aria-label="Сообщение принято сервером"
-                                                        >
-                                                            <Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
-                                                        </span>
-                                                    )}
-                                                </span>
-                                                {m.deliveryStatus === 'failed' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.stopPropagation(); void retryMessage(m); }}
-                                                        disabled={isRetryingFailed || !online}
-                                                        className="mt-1 self-end text-[11px] font-semibold text-rose-200 underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
-                                                    >
-                                                        Повторить
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* Context Menu */}
-                                            {activeMessageMenu === m.id && (
-                                                <div className={`absolute ${menuOpenUp ? 'bottom-full mb-1' : 'top-full mt-1'} flex items-center gap-1 bg-slate-900 border border-slate-700 shadow-xl rounded-xl p-1 z-50 ${m.isMine ? 'right-0' : 'left-0'}`}>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            let cleanText = m.text;
-                                                            if (cleanText.startsWith('[VOICE]:')) cleanText = '🎤 Голосовое сообщение';
-                                                            if (cleanText.startsWith('[GROUP_INVITE]:')) cleanText = '🎫 Приглашение в группу';
-                                                            setReplyTo({ id: m.id, name: m.isMine ? 'Я' : getSenderName(m.sender_id), text: cleanText });
-                                                            setActiveMessageMenu(null);
-                                                        }}
-                                                        className="flex flex-col items-center justify-center gap-1 min-w-[70px] p-2 rounded-lg hover:bg-slate-800 transition"
-                                                    >
-                                                        <Reply className="w-5 h-5 text-slate-300" />
-                                                        <span className="text-[10px] font-semibold text-slate-400">Ответить</span>
-                                                    </button>
-
-                                                    {!m.id.startsWith('pending-') && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleMessagePin(m.id);
-                                                                setActiveMessageMenu(null);
-                                                            }}
-                                                            className="flex flex-col items-center justify-center gap-1 min-w-[70px] p-2 rounded-lg hover:bg-slate-800 transition"
-                                                        >
-                                                            {pinnedMessageIds.has(m.id) ? (
-                                                                <PinOff className="w-5 h-5 text-primary" />
-                                                            ) : (
-                                                                <Pin className="w-5 h-5 text-slate-300" />
-                                                            )}
-                                                            <span className={`text-[10px] font-semibold ${pinnedMessageIds.has(m.id) ? 'text-primary' : 'text-slate-400'}`}>
-                                                                {pinnedMessageIds.has(m.id) ? 'Открепить' : 'Закрепить'}
-                                                            </span>
-                                                        </button>
-                                                    )}
-
-                                                    {m.isMine && m.deliveryStatus !== 'sending' && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                void handleDeleteMessage(m);
-                                                                setActiveMessageMenu(null);
-                                                            }}
-                                                            className="flex flex-col items-center justify-center gap-1 min-w-[70px] p-2 rounded-lg hover:bg-rose-900/40 hover:text-rose-400 transition group"
-                                                        >
-                                                            <Trash className="w-5 h-5 text-rose-400/80 group-hover:text-rose-400" />
-                                                            <span className="text-[10px] font-semibold text-rose-400/80 group-hover:text-rose-400">Удалить</span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {isSwiping && swipeOffset < 0 && (
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-slate-800 text-slate-300 z-0">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                                    </svg>
-                                                </div>
-                                            )}
-
-                                        </div>
-                                    );
-                                })}
-                            {hasMoreInHistory && renderLimit >= messages.length && (
-                                <button
-                                    type="button"
-                                    onClick={() => void loadOlderMessages()}
-                                    disabled={isLoadingOlder}
-                                    className="self-center mt-2 px-4 py-2 rounded-full border border-slate-700 bg-slate-900/90 text-xs text-slate-300 hover:text-white disabled:opacity-60"
-                                >
-                                    {isLoadingOlder ? 'Загрузка истории…' : 'Загрузить более старые сообщения'}
-                                </button>
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* Scroll back bottom float button */}
-                <button
-                    onClick={handleScrollToBottom}
-                    className={`absolute right-4 bottom-5 w-11 h-11 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-200 shadow-xl transition-all duration-300 focus:outline-none z-40 transform ${showScrollBottom ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-75 pointer-events-none'
-                        }`}
-                >
-                    <ArrowDown className="w-5 h-5 animate-bounce" />
-                </button>
-            </div>
-
-            {/* Input controller bar */}
-            <div className="chat-input-area flex-shrink-0 flex flex-col bg-slate-900/80 backdrop-blur-xl border-t border-slate-900 px-4 py-2 relative z-10">
-                {failedMessageCount > 0 && online && (
-                    <div className="flex items-center justify-between gap-3 mb-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 animate-slide-up" role="status">
-                        <div className="min-w-0">
-                            <div className="text-xs font-semibold text-amber-200">Не отправлено: {failedMessageCount}</div>
-                            <div className="text-[10px] text-amber-200/60 truncate">Соединение доступно — можно повторить отправку</div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => void retryAllFailedMessages()}
-                            disabled={isRetryingFailed}
-                            className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-400/15 px-3 py-2 text-[11px] font-bold text-amber-100 transition active:scale-95 disabled:opacity-60"
-                        >
-                            {isRetryingFailed && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                            {isRetryingFailed ? 'ОТПРАВЛЯЕМ…' : 'ОТПРАВИТЬ ВСЕ'}
-                        </button>
-                    </div>
-                )}
-                {/* Reply Preview */}
-                {replyTo && (
-                    <div className="flex items-center gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-900/60 mb-2 select-none animate-slide-up">
-                        <div className="flex-grow border-l-2 border-primary pl-3">
-                            <div className="text-xs font-semibold text-primary">{replyTo.name}</div>
-                            <div className="text-xs text-slate-400 truncate max-w-[260px]">{replyTo.text}</div>
-                        </div>
-                        <button
-                            onClick={() => setReplyTo(null)}
-                            className="text-slate-500 hover:text-slate-300 p-1"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
-
-                {/* Form controls */}
-                <div className="flex items-end gap-3 w-full relative">
-                    {isRecording && (
-                        <div className="absolute inset-y-0 left-0 right-[56px] bg-slate-900 z-20 flex items-center justify-between px-2 rounded-2xl">
-                            <div className="flex items-center gap-3">
-                                {!isRecordLocked ? (
-                                    <>
-                                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                                        <span className="text-slate-200 font-mono font-bold tracking-widest text-lg">
-                                            {Math.floor(recordingDuration / 60).toString().padStart(2, '0')}:{(recordingDuration % 60).toString().padStart(2, '0')}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <button onClick={cancelRecording} className="text-slate-400 p-2 hover:bg-slate-800 rounded-full transition">
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
-                                )}
-                            </div>
-
-                            {!isRecordLocked ? (
-                                <div className="flex flex-col items-end gap-1 select-none pointer-events-none mr-2">
-                                    <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1"><span className="text-lg leading-none">&larr;</span> Отмена</span>
-                                    <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1">Замок <span className="text-lg leading-none">&uarr;</span></span>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center flex-grow min-w-0 overflow-hidden">
-                                    {recordPreviewUrl && (
-                                        <audio
-                                            ref={previewAudioRef}
-                                            src={recordPreviewUrl}
-                                            onEnded={() => {
-                                                setIsRecordPlaying(false);
-                                                setRecordPreviewProgress(0);
-                                            }}
-                                            onTimeUpdate={(e) => {
-                                                const target = e.target as HTMLAudioElement;
-                                                if (target.duration) {
-                                                    setRecordPreviewProgress(target.currentTime / target.duration);
-                                                }
-                                            }}
-                                            className="hidden"
-                                        />
-                                    )}
-                                    {isRecordPaused ? (
-                                        <div className="flex items-center gap-2 bg-slate-800/50 py-1 px-3 rounded-full flex-grow mx-2 min-w-0">
-                                            <button
-                                                onClick={() => {
-                                                    if (previewAudioRef.current) {
-                                                        if (isRecordPlaying) {
-                                                            previewAudioRef.current.pause();
-                                                            setIsRecordPlaying(false);
-                                                        } else {
-                                                            previewAudioRef.current.play();
-                                                            setIsRecordPlaying(true);
-                                                        }
-                                                    }
-                                                }}
-                                                className="text-primary hover:scale-105 transition flex-shrink-0"
-                                            >
-                                                {isRecordPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
-                                            </button>
-
-                                            <div className="flex items-center gap-0.5 h-6 flex-grow overflow-hidden justify-center opacity-70">
-                                                {(function () {
-                                                    const bars = 30;
-                                                    let displayWave = [];
-                                                    if (recordWaveHistory.length <= bars) {
-                                                        displayWave = [...recordWaveHistory];
-                                                    } else {
-                                                        const step = recordWaveHistory.length / bars;
-                                                        for (let i = 0; i < bars; i++) {
-                                                            const start = Math.floor(i * step);
-                                                            const end = Math.floor((i + 1) * step);
-                                                            const chunk = recordWaveHistory.slice(start, end);
-                                                            const avg = chunk.length > 0 ? chunk.reduce((a, b) => a + b, 0) / chunk.length : 0;
-                                                            displayWave.push(avg);
-                                                        }
-                                                    }
-                                                    const maxVol = Math.max(...displayWave, 50);
-
-                                                    return displayWave.map((vol, idx) => {
-                                                        const isActive = idx < Math.floor(recordPreviewProgress * displayWave.length);
-                                                        return (
-                                                            <div
-                                                                key={idx}
-                                                                className={`w-[3px] min-w-[3px] rounded-[2px] transition-all ${isActive ? 'bg-primary' : 'bg-slate-400'}`}
-                                                                style={{ height: `${Math.max(10, Math.min(100, (vol / maxVol) * 100))}%` }}
-                                                            />
-                                                        );
-                                                    });
-                                                })()}
-                                            </div>
-
-                                            <span className="text-slate-300 font-mono font-bold tracking-widest text-sm flex-shrink-0">
-                                                {Math.floor(recordingDuration / 60).toString().padStart(2, '0')}:{(recordingDuration % 60).toString().padStart(2, '0')}
-                                            </span>
-                                            <div className="w-px h-5 bg-slate-700 flex-shrink-0" />
-                                            <button onClick={resumeRecording} className="text-slate-400 hover:text-red-400 transition flex items-center flex-shrink-0">
-                                                <Mic className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-3 w-full max-w-[150px] mx-auto">
-                                            <button onClick={pauseRecording} className="text-red-400 hover:text-red-300 transition p-1 bg-red-400/10 rounded-full flex-shrink-0">
-                                                <Pause className="w-5 h-5 fill-current" />
-                                            </button>
-                                            <span className="text-red-400 font-mono font-bold tracking-widest text-sm">
-                                                {Math.floor(recordingDuration / 60).toString().padStart(2, '0')}:{(recordingDuration % 60).toString().padStart(2, '0')}
-                                            </span>
-                                            <div className="flex items-center gap-0.5 h-6 flex-grow overflow-hidden justify-end">
-                                                {(function () {
-                                                    const displayWave = recordWaveHistory.slice(-30);
-                                                    const maxVol = Math.max(...recordWaveHistory, 50);
-                                                    return displayWave.map((vol, idx) => (
-                                                        <div
-                                                            key={idx}
-                                                            className="w-[3px] min-w-[3px] bg-red-400 rounded-[2px] transition-all"
-                                                            style={{ height: `${Math.max(10, Math.min(100, (vol / maxVol) * 100))}%` }}
-                                                        />
-                                                    ));
-                                                })()}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    <textarea
-                        ref={inputRef}
-                        rows={1}
-                        value={inputText}
-                        onChange={(e) => handleInputChange(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSendMessage();
-                            }
-                        }}
-                        placeholder="Сообщение..."
-                        className="flex-grow bg-slate-950 border border-slate-850 text-slate-200 rounded-2xl px-4 py-2.5 text-base focus:border-primary outline-none max-h-[120px] resize-none overflow-y-auto leading-[20px] min-h-[42px]"
-                    />
-
-                    {inputText.trim() || isRecordLocked ? (
-                        <button
-                            onClick={() => isRecordLocked ? forceStopRecordingAndSend() : handleSendMessage()}
-                            className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-primary/10 focus:outline-none z-30 flex-shrink-0"
-                        >
-                            <Send className="w-5 h-5 transform rotate-[-15deg] translate-x-[-1px] translate-y-[1px]" />
-                        </button>
-                    ) : (
-                        <button
-                            onMouseDown={startRecording}
-                            onTouchStart={startRecording}
-                            onMouseUp={stopRecordingAndSend}
-                            onTouchEnd={stopRecordingAndSend}
-                            onTouchMove={handleMicTouchMove}
-                            onMouseMove={handleMicTouchMove}
-                            style={{ transform: `scale(${micPulseScale})` }}
-                            className={`w-11 h-11 rounded-full border text-slate-300 flex items-center justify-center transition shadow-lg focus:outline-none touch-none select-none z-30 flex-shrink-0 ${isRecording ? 'bg-red-500 border-red-500 text-white shadow-red-500/20' : 'bg-slate-900 border-slate-800 active:bg-slate-800'}`}
-                        >
-                            <Mic className="w-5 h-5" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Info details screen */}
             {activeModal === 'info' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950 p-5 flex flex-col font-sans animate-fade-in">
-                    <div className="max-w-md mx-auto w-full flex flex-col h-full overflow-hidden">
-                        <div className="flex items-center justify-between pb-4 border-b border-slate-900 mb-8 shrink-0">
-                            <button
-                                onClick={() => setActiveModal('none')}
-                                className="text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-900 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                            >
-                                Закрыть
-                            </button>
-                            <span className="font-extrabold font-mono tracking-wider text-slate-300 text-xs uppercase">
-                                {isGroup ? 'Инфо Группы' : 'Профиль'}
-                            </span>
-                            <div className="w-16" />
-                        </div>
-
-                        <div className="flex flex-col items-center mb-4 relative flex-shrink-0">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-                            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-800 flex items-center justify-center text-4xl font-bold font-mono text-primary shadow-xl shadow-black/50 mb-4 z-10">
-                                {(isGroup ? groupName : chat.name).charAt(0).toUpperCase()}
-                            </div>
-
-                            <div className="flex items-center justify-center gap-2 mb-1.5 z-10 w-full px-4">
-                                <h2 className="text-2xl font-black text-slate-100 tracking-tight truncate text-center">
-                                    {isGroup ? groupName : chat.name}
-                                </h2>
-                                {isGroup && chat.created_by === currentUser.id && (
-                                    <button onClick={handleEditGroupName} className="text-slate-500 hover:text-primary transition-colors flex-shrink-0" title="Изменить имя">
-                                        <Edit2 className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2 z-10">
-                                <span className="text-[10px] font-bold font-mono text-slate-600 uppercase tracking-widest">ID</span>
-                                <span className="text-xs text-slate-400 font-mono select-text bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/50">{chat.id}</span>
-                            </div>
-                        </div>
-
-                        {isGroup ? (
-                            <div className="flex flex-col gap-3 flex-grow z-10 overflow-hidden">
-                                <button
-                                    onClick={() => setActiveModal('invite-friend')}
-                                    className="w-full bg-primary hover:bg-primary-hover active:bg-primary/90 text-white font-bold font-mono tracking-wide py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20"
-                                >
-                                    <UserPlus className="w-5 h-5" /> ПОЗВАТЬ В ГРУППУ
-                                </button>
-
-                                <div className="bg-slate-900/30 border border-slate-900/80 p-5 rounded-3xl mt-2">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-[10px] font-bold text-slate-500 font-mono uppercase tracking-widest">
-                                            Участники
-                                        </h4>
-                                        <span className="text-[10px] font-bold text-primary font-mono bg-primary/10 px-2 py-0.5 rounded-md">
-                                            {groupMembers.length}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex flex-col gap-3">
-                                        {groupMembers.map((m) => (
-                                            <div key={m.tg_id} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-800/30 transition-colors">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700/50 text-slate-300 flex items-center justify-center text-sm font-bold shadow-inner">
-                                                        {m.first_name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div className="flex flex-col leading-none gap-1">
-                                                        <span className="text-sm font-bold text-slate-200">
-                                                            {m.first_name}
-                                                        </span>
-                                                        <span className="text-[9px] font-mono text-slate-500 uppercase">
-                                                            ID: {m.tg_id}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                {m.tg_id === currentUser.id && (
-                                                    <span className="text-[9px] font-bold text-emerald-500 font-mono bg-emerald-500/10 px-2 py-1 rounded-md uppercase tracking-wider">
-                                                        Вы
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-2 mt-auto pt-2 flex-shrink-0">
-                                    <button
-                                        onClick={handleLeaveGroup}
-                                        className="w-full bg-slate-900/50 hover:bg-slate-800 text-rose-400 font-bold font-mono tracking-wide py-3.5 rounded-2xl flex items-center justify-center gap-2 transition border border-rose-500/20"
-                                    >
-                                        <LogOut className="w-4 h-4" /> ВЫЙТИ ИЗ ГРУППЫ
-                                    </button>
-                                    {chat.created_by === currentUser.id && (
-                                        <button
-                                            onClick={handleDeleteGroupForEveryone}
-                                            className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold font-mono tracking-wide py-3.5 rounded-2xl flex items-center justify-center gap-2 transition border border-rose-500/30"
-                                        >
-                                            <Trash className="w-4 h-4" /> УДАЛИТЬ ДЛЯ ВСЕХ
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-2 mt-auto pt-2 z-10 flex-shrink-0">
-                                {/* Pinned messages in profile */}
-                                {sortedPinnedMessages.length > 0 && (
-                                    <div className="bg-slate-900/30 border border-primary/15 p-3 rounded-2xl mb-1">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h4 className="text-[10px] font-bold text-primary/70 font-mono uppercase tracking-widest flex items-center gap-1.5">
-                                                <Pin className="w-3.5 h-3.5 fill-primary" /> Закреплённые
-                                            </h4>
-                                            <span className="text-[10px] font-bold text-primary font-mono bg-primary/10 px-2 py-0.5 rounded-md">
-                                                {sortedPinnedMessages.length}
-                                            </span>
-                                        </div>
-                                        <div className="space-y-1.5 max-h-[25vh] overflow-y-auto pr-1">
-                                            {sortedPinnedMessages.map((msg) => {
-                                                const msgDate = new Date(msg.created_at);
-                                                const dateStr = msgDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-                                                return (
-                                                    <div
-                                                        key={msg.id}
-                                                        onClick={() => {
-                                                            hapticImpact('light');
-                                                            setActiveModal('none');
-                                                            setTimeout(() => handleScrollToMessage(msg.id), 300);
-                                                        }}
-                                                        className="flex flex-col gap-1 p-2.5 bg-slate-950/50 border border-slate-900 rounded-xl cursor-pointer hover:bg-primary/5 active:scale-[0.98] transition-all"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[9px] font-bold text-primary/60 font-mono uppercase">
-                                                                {msg.isMine ? 'Вы' : (msg.senderName || 'Собеседник')}
-                                                            </span>
-                                                            <span className="text-[9px] text-slate-600 font-mono">{dateStr}</span>
-                                                        </div>
-                                                        <span className="text-xs text-slate-300 leading-relaxed break-words line-clamp-2">
-                                                            {msg.text || '🔗 Голосовое / вложение'}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                                <button
-                                    onClick={handleShowNameHistory}
-                                    className="w-full bg-slate-900/50 hover:bg-slate-900 text-slate-300 font-bold font-mono tracking-wide py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] border border-slate-800/80"
-                                >
-                                    <History className="w-5 h-5 text-primary" /> ИСТОРИЯ ИМЁН
-                                </button>
-                                <button
-                                    onClick={handleRemoveFriendship}
-                                    className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold font-mono tracking-wide py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] border border-rose-500/20"
-                                >
-                                    <UserMinus className="w-4.5 h-4.5" /> УДАЛИТЬ КОНТАКТ
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <ChatInfoScreen
+                    chat={chat}
+                    isGroup={isGroup}
+                    groupName={groupName}
+                    groupMembers={groupMembers}
+                    chatFingerprint={chatFingerprint}
+                    sortedPinnedMessages={sortedPinnedMessages}
+                    currentUser={currentUser}
+                    onClose={() => setActiveModal('none')}
+                    onEditGroupName={handleEditGroupName}
+                    onLeaveGroup={handleLeaveGroup}
+                    onDeleteGroup={handleDeleteGroupForEveryone}
+                    onRemoveFriend={handleRemoveFriendship}
+                    onShowNameHistory={() => { handleShowNameHistory(); }}
+                    onOpenInvite={() => setActiveModal('invite-friend')}
+                    onScrollToMessage={handleScrollToMessage}
+                />
             )}
 
             {/* Name History Dialog Overlay */}
             {showHistoryModal && (
-                <div className="fixed inset-0 z-[2000] bg-slate-950/90 backdrop-blur-md flex flex-col justify-center p-4 animate-fade-in font-sans">
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/90 p-5 rounded-3xl flex flex-col gap-4 max-w-sm w-full mx-auto relative shadow-2xl overflow-y-auto max-h-[85vh] scrollbar-thin">
-                        <h3 className="font-extrabold font-mono tracking-tight text-slate-100 text-base uppercase flex items-center gap-2">
-                            <History className="w-5 h-5 text-primary" /> История имён
-                        </h3>
-
-                        <div className="text-xs text-slate-400 leading-relaxed mb-1">
-                            Показаны только те имена собеседника, которые использовались <span className="text-primary font-semibold">ДО вашего первого контакта</span> с ним ({historyEstablishedDate}). Более новые изменения скрыты для защиты от шума и дублирования данных.
-                        </div>
-
-                        {historyLoading ? (
-                            <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-500">
-                                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                                <span className="text-xs font-mono">Вычисление среза истории...</span>
-                            </div>
-                        ) : historyNames.length > 0 ? (
-                            <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
-                                {historyNames.map((item, index) => {
-                                    const changeDate = new Date(item.changed_at);
-                                    const dateStr = changeDate.toLocaleDateString('ru-RU', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    });
-                                    return (
-                                        <div key={index} className="flex flex-col gap-1 p-3 bg-slate-950/60 border border-slate-900 rounded-xl">
-                                            <span className="font-bold text-slate-200 text-sm">{item.name}</span>
-                                            <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-                                                <Calendar className="w-3 h-3 text-slate-600" /> {dateStr}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
-                                <AlertTriangle className="w-7 h-7 text-amber-500/80 mb-2" />
-                                <span className="text-xs font-bold text-slate-400 block">Нет более ранних имён</span>
-                                <span className="text-[10px] text-slate-500 mt-1">До первого сообщения в этом чате собеседник не менял имя (или у вас актуальная версия).</span>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={() => { hapticImpact("selection"); setShowHistoryModal(false); }}
-                            className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono py-3 rounded-2xl transition mt-2"
-                        >
-                            ПОНЯТНО
-                        </button>
-                    </div>
-                </div>
+                <NameHistoryModal
+                    show={showHistoryModal}
+                    historyNames={historyNames}
+                    historyLoading={historyLoading}
+                    historyEstablishedDate={historyEstablishedDate}
+                    onClose={() => setShowHistoryModal(false)}
+                />
             )}
 
             {/* Deep Search screen */}
@@ -2569,249 +1938,35 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
             {/* Debt summary list screen */}
             {activeModal === 'debts' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950 p-6 overflow-y-auto flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
-                        <button onClick={() => setActiveModal('none')} className="text-primary font-medium">
-                            Закрыть
-                        </button>
-                        <span className="font-bold text-slate-200">Сводка долгов</span>
-                        <div className="w-10" />
-                    </div>
-
-                    <div className="bg-slate-900/40 border border-slate-900 p-5 rounded-2xl mb-6">
-                        {debts.length === 0 ? (
-                            <div className="text-center py-10 flex flex-col items-center justify-center text-slate-500 text-sm">
-                                <HelpCircle className="w-10 h-10 text-slate-700 mb-2" />
-                                Никто никому не должен
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-4 divide-y divide-slate-900">
-                                {debts.map((d, idx) => {
-                                    const amIDebtor = d.debtor_id === currentUser.id;
-                                    const amICreditor = d.creditor_id === currentUser.id;
-                                    const pending = d.status === 'payment_pending';
-
-                                    return (
-                                        <div
-                                            key={d.id}
-                                            className={`flex flex-col gap-3 ${idx > 0 ? 'pt-4' : ''}`}
-                                        >
-                                            <div className="flex justify-between items-center gap-3">
-                                                <div className="flex flex-col">
-                                                    <span className={`font-bold text-lg ${amIDebtor ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                                        {amIDebtor ? '-' : '+'} {d.amount} {d.currency}
-                                                    </span>
-                                                    <span className="text-xs text-slate-400 mt-1">
-                                                        {pending
-                                                            ? (amIDebtor ? 'Ожидает подтверждения кредитора' : 'Должник сообщил об оплате')
-                                                            : (amIDebtor ? 'Вы должны' : 'Вам должны')}
-                                                    </span>
-                                                </div>
-                                                {pending && (
-                                                    <span className="text-[10px] uppercase tracking-wider font-mono text-amber-400 border border-amber-500/20 bg-amber-500/5 px-2 py-1 rounded-lg">
-                                                        Проверка
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="flex flex-wrap gap-2">
-                                                {amIDebtor && !pending && (
-                                                    <button
-                                                        onClick={() => handleDebtAction(d, 'request')}
-                                                        className="bg-primary/10 border border-primary/20 text-primary font-semibold py-2 px-3 rounded-lg text-sm transition"
-                                                    >
-                                                        Я оплатил
-                                                    </button>
-                                                )}
-                                                {amICreditor && pending && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleDebtAction(d, 'accept')}
-                                                            className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold py-2 px-3 rounded-lg text-sm transition"
-                                                        >
-                                                            Подтвердить
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDebtAction(d, 'reject')}
-                                                            className="bg-rose-500/10 border border-rose-500/20 text-rose-400 font-semibold py-2 px-3 rounded-lg text-sm transition"
-                                                        >
-                                                            Не получено
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {amICreditor && (
-                                                    <button
-                                                        onClick={() => handleDebtAction(d, 'forgive')}
-                                                        className="bg-slate-900 border border-slate-800 text-slate-300 font-semibold py-2 px-3 rounded-lg text-sm transition"
-                                                    >
-                                                        Простить
-                                                    </button>
-                                                )}
-                                                {d.created_by === currentUser.id && d.status === 'active' && (
-                                                    <button
-                                                        onClick={() => handleDebtAction(d, 'cancel')}
-                                                        className="bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300 font-semibold py-2 px-3 rounded-lg text-sm transition"
-                                                    >
-                                                        Отменить
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <button
-                        onClick={() => setActiveModal('add-debt')}
-                        className="w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-1.5 mt-auto transition"
-                    >
-                        <Plus className="w-5 h-5" /> Оформить долг
-                    </button>
-                </div>
+                <DebtsPanel
+                    debts={debts}
+                    currentUser={currentUser}
+                    onClose={() => setActiveModal('none')}
+                    onAddDebt={() => setActiveModal('add-debt')}
+                    onDebtAction={handleDebtAction}
+                />
             )}
 
             {/* Add Debt view screen */}
             {activeModal === 'add-debt' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950 p-5 overflow-y-auto flex flex-col font-sans animate-fade-in">
-                    <div className="max-w-md mx-auto w-full flex flex-col h-full">
-                        <div className="flex items-center justify-between pb-4 border-b border-slate-900 mb-6 shrink-0">
-                            <button
-                                onClick={() => setActiveModal('debts')}
-                                className="text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-900 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                            >
-                                <ChevronLeft className="w-4 h-4" /> Назад
-                            </button>
-                            <span className="font-extrabold font-mono tracking-wider text-slate-300 text-xs uppercase">
-                                Новый долг
-                            </span>
-                            <div className="w-16" />
-                        </div>
-
-                        <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 border border-slate-900 p-5 rounded-3xl relative overflow-hidden shadow-xl flex flex-col gap-5">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-
-                            <div className="flex flex-col gap-2 relative">
-                                <label className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-widest pl-1">
-                                    Я должен (В рублях)
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        value={debtRubles}
-                                        onChange={(e) => setDebtRubles(e.target.value)}
-                                        placeholder="0"
-                                        className="w-full bg-slate-950/50 border border-slate-800 focus:border-primary/50 text-slate-100 rounded-2xl px-5 py-4 text-2xl font-bold font-mono outline-none transition-colors"
-                                    />
-                                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 font-bold font-mono text-xl">₽</span>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2 relative">
-                                <label className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-widest pl-1">
-                                    В чем принимает друг
-                                </label>
-                                <div className="relative w-full">
-                                    <select
-                                        onChange={(e) => {
-                                            const selected = currencies.find((c) => c.id === e.target.value);
-                                            setSelectedCurrency(selected || null);
-                                        }}
-                                        className="w-full bg-slate-950/50 border border-slate-800 focus:border-primary/50 text-slate-200 font-semibold rounded-2xl px-5 py-4 text-base outline-none appearance-none cursor-pointer transition-colors"
-                                    >
-                                        {currencies.length === 0 && <option value="">Загрузка...</option>}
-                                        {currencies.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.name} (Курс: {c.rub_value} ₽)
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400 bg-slate-950/50 pl-2">
-                                        <ArrowDown className="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {selectedCurrency && debtRubles && parseFloat(debtRubles) > 0 ? (
-                                <div className="text-center py-5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 my-1 relative overflow-hidden animate-fade-in">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-emerald-500/5 to-transparent animate-shimmer" />
-                                    <span className="text-[10px] text-emerald-500/70 font-bold font-mono tracking-widest uppercase">
-                                        Итого к выплате
-                                    </span>
-                                    <div className="flex items-center justify-center gap-2 mt-1">
-                                        <span className="text-3xl font-black text-emerald-400 font-mono tracking-tight">
-                                            {(parseFloat(debtRubles) / selectedCurrency.rub_value).toFixed(2)}
-                                        </span>
-                                        <span className="text-xl font-bold text-emerald-500/80 mt-1">
-                                            {selectedCurrency.name}
-                                        </span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center py-5 bg-slate-950/40 rounded-2xl border border-slate-900/60 my-1">
-                                    <span className="text-[10px] text-slate-600 font-bold font-mono tracking-widest uppercase">
-                                        Итого к выплате
-                                    </span>
-                                    <div className="flex items-center justify-center mt-1">
-                                        <span className="text-xl font-bold text-slate-500 font-mono tracking-tight">
-                                            0.00
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-
-                            <button
-                                onClick={handleSaveDebt}
-                                className="w-full bg-primary hover:bg-primary-hover active:bg-primary/90 text-white font-bold font-mono tracking-wide py-4 rounded-2xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] mt-2 shadow-lg shadow-primary/20"
-                            >
-                                ЗАФИКСИРОВАТЬ
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <AddDebtScreen
+                    debtRubles={debtRubles}
+                    onDebtRublesChange={setDebtRubles}
+                    currencies={currencies}
+                    selectedCurrency={selectedCurrency}
+                    onCurrencyChange={setSelectedCurrency}
+                    onBack={() => setActiveModal('debts')}
+                    onSave={handleSaveDebt}
+                />
             )}
 
             {/* Invite friends list selection screen */}
             {activeModal === 'invite-friend' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950 p-6 overflow-y-auto flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
-                        <button onClick={() => setActiveModal('info')} className="text-primary font-medium">
-                            Назад
-                        </button>
-                        <span className="font-bold text-slate-200">Кого позвать?</span>
-                        <div className="w-10" />
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        {friendsList.length === 0 ? (
-                            <p className="text-slate-500 text-center py-10 text-sm">
-                                Список друзей пуст
-                            </p>
-                        ) : (
-                            friendsList.map((f) => (
-                                <div
-                                    key={f.tg_id}
-                                    className="flex items-center justify-between p-4 bg-slate-900/40 border border-slate-900/60 rounded-xl"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-slate-800 text-slate-200 flex items-center justify-center text-sm font-bold">
-                                            {f.first_name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <span className="font-semibold text-slate-200 text-sm">{f.first_name}</span>
-                                    </div>
-
-                                    <button
-                                        onClick={() => handleSendGroupInvite(f.tg_id)}
-                                        className="bg-primary hover:bg-primary-hover text-white font-semibold py-2 px-4 rounded-lg text-xs transition"
-                                    >
-                                        Позвать
-                                    </button>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
+                <InviteFriendScreen
+                    friendsList={friendsList}
+                    onBack={() => setActiveModal('info')}
+                    onInvite={handleSendGroupInvite}
+                />
             )}
 
             <style>{`
