@@ -1,4 +1,5 @@
-﻿import { useRef, useEffect } from 'react';
+﻿import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Pin,
   PinOff,
@@ -63,17 +64,14 @@ export default function MessageBubble({
   const msgDate = new Date(message.created_at);
   const timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const bubbleRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number; above: boolean } | null>(null);
 
+  // Close menu position on unmount or menu close
   useEffect(() => {
-    const el = document.getElementById('msg-' + message.id);
-    if (!el || activeMessageMenu !== message.id) return;
-    const rect = el.getBoundingClientRect();
-    const areaEl = el.parentElement;
-    if (!areaEl) return;
-    const areaRect = areaEl.getBoundingClientRect();
-    const distFromBottom = areaRect.bottom - rect.bottom;
-    onMenuDirectionChange(distFromBottom < 120);
-  }, [activeMessageMenu, message.id, onMenuDirectionChange]);
+    if (!activeMessageMenu || activeMessageMenu !== message.id) {
+      setMenuPos(null);
+    }
+  }, [activeMessageMenu, message.id]);
 
   return (
     <div
@@ -116,16 +114,18 @@ export default function MessageBubble({
           if (activeMessageMenu === message.id) {
             onMenuStateChange(null);
           } else {
+            // Calculate position synchronously BEFORE setting menu open
             const msgEl = e.currentTarget as HTMLElement;
+            const msgRect = msgEl.getBoundingClientRect();
             const areaEl = msgEl.parentElement;
-            if (areaEl) {
-              const areaRect = areaEl.getBoundingClientRect();
-              const msgRect = msgEl.getBoundingClientRect();
-              const distFromBottom = areaRect.bottom - msgRect.bottom;
-              onMenuDirectionChange(distFromBottom < 120);
-            } else {
-              onMenuDirectionChange(false);
-            }
+            const areaRect = areaEl?.getBoundingClientRect();
+            const distFromBottom = areaRect ? areaRect.bottom - msgRect.bottom : 999;
+            const above = distFromBottom < 120;
+            onMenuDirectionChange(above);
+            // Position the portal menu
+            const menuY = above ? msgRect.top - 8 : msgRect.bottom + 8;
+            const menuX = message.isMine ? msgRect.right : msgRect.left;
+            setMenuPos({ x: menuX, y: menuY, above });
             onMenuStateChange(message.id);
           }
         }}
@@ -236,8 +236,18 @@ export default function MessageBubble({
           </button>
         )}
 
-        {activeMessageMenu === message.id && (
-          <div className={'absolute ' + (menuOpenUp ? 'bottom-full mb-1' : 'top-full mt-1') + ' flex items-center gap-1 bg-slate-900 border border-slate-700 shadow-xl rounded-xl p-1 z-50 ' + (message.isMine ? 'right-0' : 'left-0')}>
+        {activeMessageMenu === message.id && menuPos && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: menuPos.above ? undefined : menuPos.y,
+              bottom: menuPos.above ? (window.innerHeight - menuPos.y) : undefined,
+              left: message.isMine ? undefined : menuPos.x,
+              right: message.isMine ? (window.innerWidth - menuPos.x) : undefined,
+              zIndex: 9999,
+            }}
+            className="flex items-center gap-1 bg-slate-900 border border-slate-700 shadow-xl rounded-xl p-1"
+          >
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -286,7 +296,8 @@ export default function MessageBubble({
                 <span className="text-[10px] font-semibold text-rose-400/80 group-hover:text-rose-400">Удалить</span>
               </button>
             )}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

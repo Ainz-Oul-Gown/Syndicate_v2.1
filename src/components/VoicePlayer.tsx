@@ -286,7 +286,7 @@ hapticImpact("selection");
         <div
           ref={waveformRef}
           onPointerDown={handlePointerDown}
-          className="flex items-center gap-[3px] flex-grow h-8 cursor-pointer touch-none"
+          className="flex items-center gap-[3px] flex-grow h-8 cursor-pointer touch-manipulation"
         >
           {bars.current.map((val, idx) => {
             const isActive = idx < activeCount;
