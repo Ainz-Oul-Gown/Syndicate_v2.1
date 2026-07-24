@@ -16,7 +16,7 @@ create index if not exists messages_read_at_idx
 --    Returns the number of rows updated so the caller can decide
 --    whether a Realtime UPDATE will fire.
 create or replace function public.mark_messages_read(p_chat_id uuid)
-returns integer
+returns void
 language sql
 security definer
 set search_path = public
