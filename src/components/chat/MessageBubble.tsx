@@ -129,7 +129,7 @@ export default function MessageBubble({
             onMenuStateChange(message.id);
           }
         }}
-        className={'msg-bubble flex flex-col px-4 py-3 relative max-w-[85%] break-words overflow-hidden ' + (message.isMine
+        className={'msg-bubble flex flex-col px-4 py-3 relative max-w-[85%] break-words ' + (message.isMine
           ? 'msg-mine bg-primary text-white rounded-[18px] rounded-br-[4px] shadow-md shadow-primary/10'
           : 'msg-other bg-slate-900 border border-slate-850 text-slate-100 rounded-[18px] rounded-bl-[4px]'
         )}
