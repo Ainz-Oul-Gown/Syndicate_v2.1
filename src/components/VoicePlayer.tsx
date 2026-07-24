@@ -216,14 +216,10 @@ hapticImpact("error");
       return;
     }
 
-    try {
-      waveformRef.current?.setPointerCapture(e.pointerId);
-    } catch (err) {}
-
     setIsScrubbing(true);
     const pct = updateScrubProgress(e.clientX);
 
-hapticImpact("selection");
+    hapticImpact("selection");
 
     const handlePointerMove = (ev: globalThis.PointerEvent) => {
       updateScrubProgress(ev.clientX);

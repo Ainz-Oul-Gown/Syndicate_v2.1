@@ -117,10 +117,10 @@ export default function MessageBubble({
             // Calculate position synchronously BEFORE setting menu open
             const msgEl = e.currentTarget as HTMLElement;
             const msgRect = msgEl.getBoundingClientRect();
-            const areaEl = msgEl.parentElement;
-            const areaRect = areaEl?.getBoundingClientRect();
-            const distFromBottom = areaRect ? areaRect.bottom - msgRect.bottom : 999;
-            const above = distFromBottom < 120;
+            const menuH = 52; // approximate menu height
+            const spaceBelow = window.innerHeight - msgRect.bottom;
+            const spaceAbove = msgRect.top;
+            const above = spaceBelow < menuH + 16 && spaceAbove > spaceBelow;
             onMenuDirectionChange(above);
             // Position the portal menu
             const menuY = above ? msgRect.top - 8 : msgRect.bottom + 8;
