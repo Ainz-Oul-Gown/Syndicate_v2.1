@@ -32,6 +32,8 @@ export interface MessageBubbleProps {
   onScrollToMessage: (id: string) => void;
   onMenuStateChange: (id: string | null) => void;
   onMenuDirectionChange: (up: boolean) => void;
+  onSwipeStart?: (msgId: string) => void;
+  onSwipeMove?: (msgId: string, deltaX: number) => void;
   chatKey: CryptoKey | null;
   onManualTranscribe: (fileName: string, msgId: string) => Promise<void>;
   onRetry: (msg: DecryptedMessage) => void;
@@ -55,6 +57,8 @@ export default function MessageBubble({
   onScrollToMessage,
   onMenuStateChange,
   onMenuDirectionChange,
+  onSwipeStart,
+  onSwipeMove,
   chatKey,
   onManualTranscribe,
   onRetry,
@@ -81,6 +85,7 @@ export default function MessageBubble({
         (bubbleRef.current as any).__touchStartX = touch.clientX;
         (bubbleRef.current as any).__touchStartY = touch.clientY;
         (bubbleRef.current as any).__swipingMsgId = message.id;
+        onSwipeStart?.(message.id);
       }}
       onTouchMove={(e) => {
         const touch = e.touches[0];
@@ -89,6 +94,7 @@ export default function MessageBubble({
         const deltaX = touch.clientX - startX;
         const deltaY = touch.clientY - startY;
         if (deltaX < 0 && Math.abs(deltaX) > Math.abs(deltaY)) {
+          onSwipeMove?.(message.id, deltaX);
           if (Math.abs(deltaX) > 50) {
             let cleanText = message.text;
             if (cleanText.startsWith('[VOICE]:')) cleanText = '🎤 Голосовое сообщение';
@@ -100,6 +106,7 @@ export default function MessageBubble({
       }}
       onTouchEnd={() => {
         (bubbleRef.current as any).__swipingMsgId = null;
+        onSwipeMove?.(message.id, 0);
       }}
       className={'flex w-full relative ' + (message.isMine ? 'justify-end' : 'justify-start')}
     >

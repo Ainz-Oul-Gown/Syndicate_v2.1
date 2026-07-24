@@ -1873,6 +1873,22 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 onScrollToMessage={handleScrollToMessage}
                 onMenuStateChange={setActiveMessageMenu}
                 onMenuDirectionChange={setMenuOpenUp}
+                onSwipeStart={(msgId) => {
+                    swipingMsgId.current = msgId;
+                    setSwipeOffset(0);
+                }}
+                onSwipeMove={(msgId, deltaX) => {
+                    if (swipingMsgId.current !== msgId) return;
+                    if (deltaX < 0) {
+                        setSwipeOffset(Math.max(deltaX, -80));
+                        if (Math.abs(deltaX) > 50) {
+                            swipingMsgId.current = null;
+                            setSwipeOffset(0);
+                        }
+                    } else {
+                        setSwipeOffset(0);
+                    }
+                }}
                 onManualTranscribe={handleManualTranscribe}
                 onRetry={retryMessage}
                 isRetryingFailed={isRetryingFailed}

@@ -27,6 +27,8 @@ export interface MessageListProps {
   onScrollToMessage: (id: string) => void;
   onMenuStateChange: (id: string | null) => void;
   onMenuDirectionChange: (up: boolean) => void;
+  onSwipeStart?: (msgId: string) => void;
+  onSwipeMove?: (msgId: string, deltaX: number) => void;
   onManualTranscribe: (fileName: string, msgId: string) => Promise<void>;
   onRetry: (msg: DecryptedMessage) => void;
   isRetryingFailed: boolean;
@@ -58,6 +60,8 @@ export default function MessageList({
   onScrollToMessage,
   onMenuStateChange,
   onMenuDirectionChange,
+  onSwipeStart,
+  onSwipeMove,
   onManualTranscribe,
   onRetry,
   isRetryingFailed,
@@ -106,6 +110,8 @@ export default function MessageList({
                     onScrollToMessage={onScrollToMessage}
                     onMenuStateChange={onMenuStateChange}
                     onMenuDirectionChange={onMenuDirectionChange}
+                    onSwipeStart={onSwipeStart}
+                    onSwipeMove={onSwipeMove}
                     chatKey={chatKey}
                     onManualTranscribe={onManualTranscribe}
                     onRetry={onRetry}

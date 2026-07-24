@@ -264,7 +264,7 @@ hapticImpact("error");
       <div className="flex items-center gap-3 w-full">
         {/* Play/Pause Button */}
         <button
-          onClick={handlePlayPause}
+          onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
           disabled={isLoading}
           className={
             isMine
@@ -281,10 +281,17 @@ hapticImpact("error");
           )}
         </button>
 
-        {/* Waveform wrapper */}
+        {/* Waveform wrapper — stopPropagation prevents swipe-to-reply and context menu from triggering on the waveform */}
         <div
           ref={waveformRef}
-          onPointerDown={handlePointerDown}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            handlePointerDown(e);
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-[3px] flex-grow h-8 cursor-pointer touch-manipulation"
         >
           {bars.current.map((val, idx) => {
