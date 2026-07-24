@@ -1925,6 +1925,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
                 online={online}
                 onRetryAll={retryAllFailedMessages}
                 inputRef={inputRef}
+                previewAudioRef={previewAudioRef}
             />
 
             {activeModal === 'info' && (

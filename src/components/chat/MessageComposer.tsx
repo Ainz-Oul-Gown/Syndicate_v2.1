@@ -31,6 +31,7 @@ export interface MessageComposerProps {
   online: boolean;
   onRetryAll: () => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  previewAudioRef: RefObject<HTMLAudioElement | null>;
 }
 
 export default function MessageComposer({
@@ -61,6 +62,7 @@ export default function MessageComposer({
   online,
   onRetryAll,
   inputRef,
+  previewAudioRef,
 }: MessageComposerProps) {
   return (
     <div className="chat-input-area flex-shrink-0 flex flex-col bg-slate-900/80 backdrop-blur-xl border-t border-slate-900 px-4 py-2 relative z-10">
@@ -120,7 +122,7 @@ export default function MessageComposer({
             ) : (
               <div className="flex items-center justify-center flex-grow min-w-0 overflow-hidden">
                 {recordPreviewUrl && (
-                  <audio ref={inputRef as any} src={recordPreviewUrl} onEnded={() => {}} className="hidden" />
+                  <audio ref={previewAudioRef as any} src={recordPreviewUrl} onEnded={() => {}} className="hidden" />
                 )}
                 {isRecordPaused ? (
                   <div className="flex items-center gap-2 bg-slate-800/50 py-1 px-3 rounded-full flex-grow mx-2 min-w-0">
