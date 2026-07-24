@@ -296,11 +296,13 @@ hapticImpact("error");
 
     setIsScrubbing(true);
     isScrubbingRef.current = true;
-    const pct = updateScrubProgress(e.clientX);
+    const startPct = updateScrubProgress(e.clientX);
+    let didMove = false;
 
     hapticImpact("selection");
 
     const handlePointerMove = (ev: globalThis.PointerEvent) => {
+      didMove = true;
       updateScrubProgress(ev.clientX);
     };
 
@@ -309,8 +311,9 @@ hapticImpact("error");
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
 
-      const finalPct = updateScrubProgress(ev.clientX);
-      if (audioRef.current && audioRef.current.duration) {
+      // Only seek if the user actually dragged on the waveform
+      if (didMove && audioRef.current && audioRef.current.duration) {
+        const finalPct = updateScrubProgress(ev.clientX);
         audioRef.current.currentTime = finalPct * audioRef.current.duration;
       }
       setIsScrubbing(false);
