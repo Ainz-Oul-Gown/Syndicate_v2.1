@@ -18,7 +18,12 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 // Helper to convert base64 to array buffer
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = atob(base64.replace(/[^A-Za-z0-9+/=]/g, ''));
+  // Строгая проверка формата base64 — отклоняем некорректные данные вместо silent-очистки
+  const cleaned = base64.replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned) || cleaned.length === 0) {
+    throw new Error('Некорректный формат base64');
+  }
+  const binaryString = atob(cleaned);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
@@ -282,11 +287,12 @@ export async function getFingerprint(jwkKeyString: string | undefined): Promise<
   if (!jwkKeyString) return 'НЕТ КЛЮЧА';
   const hashBuffer = await window.crypto.subtle.digest('SHA-256', enc.encode(jwkKeyString));
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const num = ((hashArray[0] << 24) | (hashArray[1] << 16) | (hashArray[2] << 8) | hashArray[3]) >>> 0;
-  
-  const numStr = num.toString().padStart(10, '0');
-  const matched = numStr.match(/.{1,5}/g);
-  return matched ? matched.join('-') : numStr;
+
+  // Полный SHA-256 fingerprint (256 бит) — отображаем как группы по 5 hex-символов
+  // Формат: XXXXX-XXXXX-XXXXX-... (13 групп, 65 символов + 12 дефисов)
+  const hex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  const groups = hex.match(/.{1,5}/g);
+  return groups ? groups.join('-') : hex;
 }
 
 // Check crypto keys local / global logic

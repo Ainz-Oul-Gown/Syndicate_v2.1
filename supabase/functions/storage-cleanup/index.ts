@@ -1,38 +1,22 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { jwtVerify } from 'npm:jose@5';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const url = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const jwtSecret = Deno.env.get('JWT_SECRET');
-    if (!url || !serviceKey || !jwtSecret) throw new Error('Missing server configuration');
-
     const auth = req.headers.get('Authorization') || '';
     if (!auth.startsWith('Bearer ')) throw new Error('Unauthorized');
 
-    const { payload } = await jwtVerify(auth.slice(7), new TextEncoder().encode(jwtSecret), {
-      algorithms: ['HS256'],
-      issuer: 'supabase',
-      audience: 'authenticated',
-    });
-    const tgId = Number(payload.tg_id);
-    const sessionVersion = Number(payload.session_version);
-    if (!Number.isSafeInteger(tgId) || !Number.isInteger(sessionVersion)) throw new Error('Unauthorized');
+    const { userId, stableId, sessionVersion } = await verifySyndicateToken(auth.slice(7));
 
-    const client = createClient(url, serviceKey, { auth: { persistSession: false } });
+    const client = createAdminClient();
     const { data: user } = await client
       .from('users')
-      .select('session_version, status')
-      .eq('tg_id', tgId)
+      .select('session_version, status, account_state')
+      .eq('tg_id', stableId)
       .maybeSingle();
-    if (!user || Number(user.session_version) !== sessionVersion || user.status === 'blocked') {
+    const accountState = user?.account_state || (user?.status === 'blocked' ? 'blocked' : 'active');
+    if (!user || Number(user.session_version) !== sessionVersion
+      || accountState === 'blocked' || accountState === 'deleted' || accountState === 'deactivated') {
       throw new Error('Session revoked');
     }
 
@@ -57,13 +41,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ processed: rows?.length || 0, removed }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-    });
+    return json({ processed: rows?.length || 0, removed });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-    });
+    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 401);
   }
 });

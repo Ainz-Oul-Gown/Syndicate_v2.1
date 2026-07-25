@@ -1,12 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
 
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Cache-Control': 'no-store',
+export function getCorsHeaders(origin?: string | null) {
+  const allowed = Deno.env.get('ALLOWED_ORIGINS')
+  let allowOrigin = '*'
+  if (allowed && origin) {
+    const origins = allowed.split(',').map((o) => o.trim()).filter(Boolean)
+    if (origins.includes(origin)) {
+      allowOrigin = origin
+    }
+  }
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Cache-Control': 'no-store',
+  }
 }
+
+/** @deprecated Используй getCorsHeaders(req.headers.get('Origin')) */
+export const corsHeaders = getCorsHeaders()
 
 export function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -198,6 +211,15 @@ export async function unwrapProviderVaultSecret(wrapped: unknown) {
     throw new Error('Не удалось расшифровать recovery-секрет провайдера')
   }
   return new TextDecoder().decode(plain)
+}
+
+export function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return diff === 0
 }
 
 export async function verifySyndicateToken(token: unknown) {

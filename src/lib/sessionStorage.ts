@@ -11,7 +11,7 @@ export function writeSessionToken(token: string | null): void {
         localStorage.removeItem(TOKEN_KEY);
     }
 
-    // Удаляем старую временную копию после миграции.
+    // РћС‡РёСЃС‚РєР° СЃС‚Р°СЂРѕРіРѕ С‚РѕРєРµРЅР° РёР· sessionStorage (РјРѕРі РѕСЃС‚Р°С‚СЊСЃСЏ РїСЂРё РјРёРіСЂР°С†РёРё).
     sessionStorage.removeItem(TOKEN_KEY);
 }
 

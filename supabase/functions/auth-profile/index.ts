@@ -19,15 +19,15 @@ serve(async (req) => {
       .eq('tg_id', stableId)
       .maybeSingle()
     if (error) throw error
-    if (!user) return json({ exists: false, user: null })
+    // Единый generic-ответ: не раскрываем existence/status/unavailable — предотвращает user enumeration (В1)
+    if (!user) return json({ user: null })
 
     const state = user.account_state || (user.status === 'blocked' ? 'blocked' : 'active')
     if (state === 'blocked' || state === 'deleted' || user.status === 'blocked') {
-      return json({ exists: true, user: null, unavailable: true })
+      return json({ user: null })
     }
 
     return json({
-      exists: true,
       user: {
         id: user.id,
         tg_id: user.tg_id,

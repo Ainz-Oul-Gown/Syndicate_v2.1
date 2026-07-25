@@ -1,32 +1,13 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { jwtVerify } from 'npm:jose@5';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status,
-  headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-});
+import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const url = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const jwtSecret = Deno.env.get('JWT_SECRET');
-    if (!url || !serviceKey || !jwtSecret) throw new Error('Missing server configuration');
-
     const auth = req.headers.get('Authorization') || '';
     if (!auth.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
-    const { payload } = await jwtVerify(auth.slice(7), new TextEncoder().encode(jwtSecret), {
-      algorithms: ['HS256'], issuer: 'supabase', audience: 'authenticated',
-    });
-    const tgId = Number(payload.tg_id);
-    const sessionVersion = Number(payload.session_version);
-    if (!Number.isSafeInteger(tgId) || !Number.isInteger(sessionVersion)) return json({ error: 'Unauthorized' }, 401);
+
+    const { userId, stableId, sessionVersion } = await verifySyndicateToken(auth.slice(7));
+    const tgId = stableId;
 
     const { messageId, chatId, oldPath, newPath, encryptedText } = await req.json();
     if (![messageId, chatId, oldPath, newPath, encryptedText].every((v) => typeof v === 'string' && v.length > 0)) {
@@ -36,9 +17,11 @@ Deno.serve(async (req) => {
       return json({ error: 'Invalid storage path' }, 400);
     }
 
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-    const { data: user } = await admin.from('users').select('session_version, status').eq('tg_id', tgId).maybeSingle();
-    if (!user || Number(user.session_version) !== sessionVersion || user.status === 'blocked') {
+    const admin = createAdminClient();
+    const { data: user } = await admin.from('users').select('session_version, status, account_state').eq('tg_id', tgId).maybeSingle();
+    const accountState = user?.account_state || (user?.status === 'blocked' ? 'blocked' : 'active');
+    if (!user || Number(user.session_version) !== sessionVersion
+      || accountState === 'blocked' || accountState === 'deleted' || accountState === 'deactivated') {
       return json({ error: 'Session revoked' }, 401);
     }
 

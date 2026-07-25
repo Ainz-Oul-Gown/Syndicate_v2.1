@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createAdminClient, json } from '../_shared/provider-auth.ts'
+import { constantTimeEqual, createAdminClient, json } from '../_shared/provider-auth.ts'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
 
 async function getGoogleAccessToken(serviceAccount: any) {
@@ -22,12 +22,11 @@ serve(async (req) => {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
     try {
         const expected = Deno.env.get('PUSH_WEBHOOK_SECRET')
-        if (!expected || req.headers.get('x-push-secret') !== expected) {
-            console.error('Unauthorized request');
+        const received = req.headers.get('x-push-secret') || ''
+        if (!expected || !constantTimeEqual(received, expected)) {
             return json({ error: 'Unauthorized' }, 401)
         }
         const payload = await req.json()
-        console.log('Webhook payload received:', JSON.stringify(payload))
         const record = payload?.record || payload
         const chatId = record?.chat_id
         const senderId = Number(record?.sender_id)

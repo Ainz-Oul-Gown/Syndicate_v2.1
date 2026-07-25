@@ -19,14 +19,15 @@ serve(async (req) => {
       .eq('tg_id', stableId)
       .maybeSingle()
     if (error) throw error
-    if (!user) throw new Error('Пользователь не найден')
+    // Единый generic-ответ — предотвращает user enumeration (В1)
+    if (!user) throw new Error('Не удалось подготовить запрос')
     const state = user.account_state || (user.status === 'blocked' ? 'blocked' : 'active')
-    if (state === 'blocked' || state === 'deleted' || user.status === 'blocked') throw new Error('Аккаунт заблокирован')
+    if (state === 'blocked' || state === 'deleted' || user.status === 'blocked') throw new Error('Не удалось подготовить запрос')
 
     let payload: any
-    try { payload = JSON.parse(user.public_key || '{}') } catch { throw new Error('Повреждён контейнер публичных ключей') }
+    try { payload = JSON.parse(user.public_key || '{}') } catch { throw new Error('Не удалось подготовить запрос') }
     const passkeys = Array.isArray(payload.passkeys) ? payload.passkeys : []
-    if (!passkeys.length) throw new Error('Для аккаунта не зарегистрирован Passkey')
+    if (!passkeys.length) throw new Error('Не удалось подготовить запрос')
 
     const options = await generateAuthenticationOptions({
       rpID,
