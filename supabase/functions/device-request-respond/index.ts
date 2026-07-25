@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
 
 function decodeBase64(value: unknown) {
   if (typeof value !== 'string' || value.length > 2048) throw new Error('Некорректная подпись')
@@ -9,8 +9,9 @@ function decodeBase64(value: unknown) {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
   try {
     const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
     const identity = await verifySyndicateToken(bearer)
@@ -50,8 +51,8 @@ serve(async (req) => {
     }).eq('id', requestId).eq('status', 'pending').select('id').maybeSingle()
     if (updateError) throw updateError
     if (!updated) throw new Error('Заявка уже была обработана')
-    return json({ ok: true })
+    return json({ ok: true }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Unknown error' }, 400)
+    return json({ error: error?.message || 'Unknown error' }, 400, origin)
   }
 })

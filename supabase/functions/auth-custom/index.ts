@@ -1,13 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
-import { issueRefreshToken } from '../_shared/provider-auth.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { getCorsHeaders, createAdminClient, json, issueRefreshToken } from '../_shared/provider-auth.ts'
 
 async function consumeRegistrationInvite(supabaseAdmin: any, rawCode: unknown) {
   const code = typeof rawCode === 'string' ? rawCode.trim().toUpperCase() : '';
@@ -20,8 +14,10 @@ async function consumeRegistrationInvite(supabaseAdmin: any, rawCode: unknown) {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
+  const origin = req.headers.get('Origin')
+  const headers = getCorsHeaders(origin)
+  if (req.method === 'OPTIONS') return new Response('ok', { headers });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin);
 
   try {
     const JWT_SECRET = Deno.env.get('JWT_SECRET');
@@ -54,14 +50,13 @@ serve(async (req) => {
 
     const now = Math.floor(Date.now() / 1000);
     const jwt = await new jose.SignJWT({ aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, auth_provider: 'seed', session_version: Number(dbUser.session_version || 1), sub: dbUser.id })
-      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).setIssuedAt(now).setExpirationTime(now + 30 * 60)  // 30 минут вместо 7 дней
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).setIssuedAt(now).setExpirationTime(now + 30 * 60)
       .sign(new TextEncoder().encode(JWT_SECRET));
 
-    // К2: Выдаём refresh-токен
     const refreshToken = await issueRefreshToken(supabaseAdmin, dbUser.id, req.headers.get('user-agent'));
 
-    return new Response(JSON.stringify({ token: jwt, refreshToken, user: dbUser }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return json({ token: jwt, refreshToken, user: dbUser }, 200, origin);
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return json({ error: err?.message || 'Unknown error' }, 400, origin);
   }
 })

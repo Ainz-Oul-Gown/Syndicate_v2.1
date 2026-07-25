@@ -21,10 +21,10 @@ export function getCorsHeaders(origin?: string | null) {
 /** @deprecated Используй getCorsHeaders(req.headers.get('Origin')) */
 export const corsHeaders = getCorsHeaders()
 
-export function json(body: unknown, status = 200) {
+export function json(body: unknown, status = 200, origin?: string | null) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' },
+    headers: { ...getCorsHeaders(origin), 'Content-Type': 'application/json; charset=utf-8' },
   })
 }
 

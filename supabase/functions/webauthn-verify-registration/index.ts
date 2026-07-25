@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { verifyRegistrationResponse } from 'npm:@simplewebauthn/server'
 import { encodeBase64Url } from 'https://deno.land/std@0.224.0/encoding/base64url.ts'
 import {
-  consumeRegistrationInvite, corsHeaders, createAdminClient, issueUserToken,
+  consumeRegistrationInvite, getCorsHeaders, createAdminClient, issueUserToken,
   issueRefreshToken, json, normalizePublicKeysPayload, verifySyndicateToken,
 } from '../_shared/provider-auth.ts'
 
@@ -12,8 +12,9 @@ function readBearer(req: Request) {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const { stableId, name, response, publicKeysPayload, registrationInvite } = await req.json()
@@ -118,8 +119,8 @@ serve(async (req) => {
     const token = await issueUserToken(finalUser, 'passkey')
     // К2: Выдаём refresh-токен
     const refreshToken = await issueRefreshToken(admin, finalUser.id, req.headers.get('user-agent'))
-    return json({ verified: true, token, refreshToken, user: finalUser })
+    return json({ verified: true, token, refreshToken, user: finalUser }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Не удалось зарегистрировать Passkey' }, 400)
+    return json({ error: error?.message || 'Не удалось зарегистрировать Passkey' }, 400, origin)
   }
 })

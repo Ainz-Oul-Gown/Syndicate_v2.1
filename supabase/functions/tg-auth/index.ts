@@ -3,7 +3,7 @@ import {
   allocateStableId,
   bindIdentity,
   consumeRegistrationInvite,
-  corsHeaders,
+  getCorsHeaders,
   createAdminClient,
   findUserByCandidateIds,
   getIdentityUser,
@@ -119,12 +119,13 @@ async function validateInitData(initData: unknown) {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const contentLength = Number(req.headers.get('content-length') || '0')
-    if (contentLength > 300_000) return json({ error: 'Слишком большой запрос' }, 413)
+    if (contentLength > 300_000) return json({ error: 'Слишком большой запрос' }, 413, origin)
 
     const body = await req.json()
     const { user: telegramUser } = await validateInitData(body.initData)
@@ -157,7 +158,7 @@ serve(async (req) => {
     }
 
     if (!user && !isRegister) {
-      return json({ registrationRequired: true, telegram: telegramProfile(telegramUser) })
+      return json({ registrationRequired: true, telegram: telegramProfile(telegramUser) }, 200, origin)
     }
 
     if (isRegister) {
@@ -225,10 +226,10 @@ serve(async (req) => {
         vaultSecret,
         needsVaultMigration: !vaultSecret,
       },
-    })
+    }, 200, origin)
   } catch (error: any) {
     const message = error?.message || 'Ошибка Telegram Mini App-аутентификации'
     const status = /поддельные|подпись/i.test(message) ? 403 : /устарела/i.test(message) ? 401 : 400
-    return json({ error: message }, status)
+    return json({ error: message }, status, origin)
   }
 })

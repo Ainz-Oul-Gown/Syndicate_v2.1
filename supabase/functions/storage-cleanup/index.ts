@@ -1,7 +1,8 @@
-import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts';
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts';
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) });
   try {
     const auth = req.headers.get('Authorization') || '';
     if (!auth.startsWith('Bearer ')) throw new Error('Unauthorized');
@@ -41,8 +42,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ processed: rows?.length || 0, removed });
+    return json({ processed: rows?.length || 0, removed }, 200, origin);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 401);
+    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 401, origin);
   }
 });

@@ -1,18 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
-import { issueRefreshToken } from '../_shared/provider-auth.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status,
-  headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-});
+import { getCorsHeaders, json, issueRefreshToken } from '../_shared/provider-auth.ts'
 
 function base64ToBytes(value: string): Uint8Array {
   if (typeof value !== 'string' || value.length < 16 || value.length > 1024) throw new Error('Некорректная подпись');
@@ -22,8 +11,10 @@ function base64ToBytes(value: string): Uint8Array {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const origin = req.headers.get('Origin')
+  const headers = getCorsHeaders(origin)
+  if (req.method === 'OPTIONS') return new Response('ok', { headers });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin);
 
   try {
     const JWT_SECRET = Deno.env.get('JWT_SECRET');
@@ -100,21 +91,19 @@ serve(async (req) => {
       effectiveUser = { ...dbUser, ...restored, account_state: 'active' };
     }
 
-    // К2: Access-токен 30 минут (вместо 7 дней)
     const now = Math.floor(Date.now() / 1000);
     const token = await new jose.SignJWT({
       aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, auth_provider: 'seed', session_version: Number(effectiveUser.session_version || 1), sub: effectiveUser.id,
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuedAt(now)
-      .setExpirationTime(now + 30 * 60)  // 30 минут вместо 7 дней
+      .setExpirationTime(now + 30 * 60)
       .sign(new TextEncoder().encode(JWT_SECRET));
 
-    // К2: Выдаём refresh-токен
     const refreshToken = await issueRefreshToken(supabaseAdmin, effectiveUser.id, req.headers.get('user-agent'));
 
-    return json({ token, refreshToken, user: { id: effectiveUser.id, tg_id: effectiveUser.tg_id, first_name: effectiveUser.first_name } });
+    return json({ token, refreshToken, user: { id: effectiveUser.id, tg_id: effectiveUser.tg_id, first_name: effectiveUser.first_name } }, 200, origin);
   } catch (err: any) {
-    return json({ error: err?.message || 'Unknown error' }, 400);
+    return json({ error: err?.message || 'Unknown error' }, 400, origin);
   }
 });

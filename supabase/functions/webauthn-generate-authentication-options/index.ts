@@ -1,17 +1,36 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { generateAuthenticationOptions } from 'npm:@simplewebauthn/server'
-import { corsHeaders, createAdminClient, json } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json, checkRateLimit, recordAuthAttempt } from '../_shared/provider-auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const { stableId } = await req.json()
     if (!Number.isSafeInteger(stableId) || stableId <= 0) throw new Error('Некорректный ID пользователя')
-    const origin = req.headers.get('origin') || 'http://localhost:3000'
-    const rpID = new URL(origin).hostname
+    const requestOrigin = req.headers.get('origin') || 'http://localhost:3000'
+    const rpID = new URL(requestOrigin).hostname
     const admin = createAdminClient()
+
+    // В1: Rate-limit по IP — не более 10 запросов challenge за 10 минут
+    const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const ipOk = await checkRateLimit(admin, `webauthn_challenge:${clientIp}`, 'challenge_ip', 10, 10)
+    if (!ipOk) {
+      await recordAuthAttempt(admin, `webauthn_challenge:${clientIp}`, 'challenge_ip', false)
+      throw new Error('Не удалось подготовить запрос')
+    }
+
+    // В1: Rate-limit по stableId — не более 5 запросов challenge за 10 минут
+    // Защита от DoS через overwrite challenge
+    const stableIdOk = await checkRateLimit(admin, `webauthn_challenge:${stableId}`, 'challenge_stable', 5, 10)
+    if (!stableIdOk) {
+      await recordAuthAttempt(admin, `webauthn_challenge:${stableId}`, 'challenge_stable', false)
+      throw new Error('Не удалось подготовить запрос')
+    }
+
+    await recordAuthAttempt(admin, `webauthn_challenge:${clientIp}`, 'challenge_ip', true)
 
     const { data: user, error } = await admin
       .from('users')
@@ -33,9 +52,6 @@ serve(async (req) => {
       rpID,
       allowCredentials: passkeys.map((credential: any) => ({
         id: credential.id,
-        // Ensure transports always has a value. An empty/missing transports array
-        // causes the browser to look for any authenticator (USB/NFC keys) instead
-        // of using the platform authenticator (fingerprint/FaceID).
         transports: credential.transports?.length ? credential.transports : ['internal'],
       })),
       userVerification: 'preferred',
@@ -47,7 +63,7 @@ serve(async (req) => {
       challenge: options.challenge,
       stableId,
       userId: user.id,
-      origin,
+      origin: requestOrigin,
       rpID,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     })
@@ -58,8 +74,8 @@ serve(async (req) => {
     })
     if (challengeError) throw challengeError
 
-    return json(options)
+    return json(options, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Не удалось создать Passkey challenge' }, 400)
+    return json({ error: error?.message || 'Не удалось создать Passkey challenge' }, 400, origin)
   }
 })

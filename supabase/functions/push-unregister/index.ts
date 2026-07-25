@@ -1,9 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
   try {
     const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
     const identity = await verifySyndicateToken(bearer)
@@ -14,8 +15,8 @@ serve(async (req) => {
       .update({ active: false, last_seen_at: new Date().toISOString() })
       .eq('user_id', identity.userId).eq('token', token)
     if (error) throw error
-    return json({ ok: true })
+    return json({ ok: true }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Unknown error' }, 400)
+    return json({ error: error?.message || 'Unknown error' }, 400, origin)
   }
 })

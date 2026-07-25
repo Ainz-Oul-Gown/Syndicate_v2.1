@@ -1,20 +1,21 @@
-import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts';
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts';
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) });
   try {
     const auth = req.headers.get('Authorization') || '';
-    if (!auth.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
+    if (!auth.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401, origin);
 
     const { userId, stableId, sessionVersion } = await verifySyndicateToken(auth.slice(7));
     const tgId = stableId;
 
     const { messageId, chatId, oldPath, newPath, encryptedText } = await req.json();
     if (![messageId, chatId, oldPath, newPath, encryptedText].every((v) => typeof v === 'string' && v.length > 0)) {
-      return json({ error: 'Invalid migration payload' }, 400);
+      return json({ error: 'Invalid migration payload' }, 400, origin);
     }
     if (oldPath.includes('/') || !newPath.startsWith(`${chatId}/${tgId}/`) || !newPath.endsWith('.bin')) {
-      return json({ error: 'Invalid storage path' }, 400);
+      return json({ error: 'Invalid storage path' }, 400, origin);
     }
 
     const admin = createAdminClient();
@@ -22,7 +23,7 @@ Deno.serve(async (req) => {
     const accountState = user?.account_state || (user?.status === 'blocked' ? 'blocked' : 'active');
     if (!user || Number(user.session_version) !== sessionVersion
       || accountState === 'blocked' || accountState === 'deleted' || accountState === 'deactivated') {
-      return json({ error: 'Session revoked' }, 401);
+      return json({ error: 'Session revoked' }, 401, origin);
     }
 
     const { data: message, error: messageError } = await admin
@@ -32,10 +33,10 @@ Deno.serve(async (req) => {
       .eq('chat_id', chatId)
       .maybeSingle();
     if (messageError) throw messageError;
-    if (!message || Number(message.sender_id) !== tgId) return json({ error: 'Only the original sender can migrate this file' }, 403);
+    if (!message || Number(message.sender_id) !== tgId) return json({ error: 'Only the original sender can migrate this file' }, 403, origin);
 
     const existing = await admin.from('message_attachments').select('storage_path').eq('message_id', messageId).maybeSingle();
-    if (existing.data?.storage_path?.includes('/')) return json({ migrated: false, path: existing.data.storage_path });
+    if (existing.data?.storage_path?.includes('/')) return json({ migrated: false, path: existing.data.storage_path }, 200, origin);
 
     const download = await admin.storage.from('voice_messages').download(oldPath);
     if (download.error || !download.data) throw download.error || new Error('Legacy file not found');
@@ -69,8 +70,8 @@ Deno.serve(async (req) => {
     if (removed.error) {
       await admin.from('storage_cleanup_queue').upsert({ bucket_id: 'voice_messages', storage_path: oldPath }, { onConflict: 'bucket_id,storage_path' });
     }
-    return json({ migrated: true, path: newPath });
+    return json({ migrated: true, path: newPath }, 200, origin);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 400);
+    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 400, origin);
   }
 });

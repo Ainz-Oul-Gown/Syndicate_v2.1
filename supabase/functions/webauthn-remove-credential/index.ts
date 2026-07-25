@@ -1,9 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const header = req.headers.get('authorization') || ''
@@ -38,8 +39,8 @@ serve(async (req) => {
       .eq('id', user.id)
     if (updateError) throw updateError
 
-    return json({ removed })
+    return json({ removed }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Не удалось удалить Passkey' }, 400)
+    return json({ error: error?.message || 'Не удалось удалить Passkey' }, 400, origin)
   }
 })

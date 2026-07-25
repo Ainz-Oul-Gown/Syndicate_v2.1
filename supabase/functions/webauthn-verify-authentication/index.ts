@@ -1,11 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { verifyAuthenticationResponse } from 'npm:@simplewebauthn/server'
 import { decodeBase64Url } from 'https://deno.land/std@0.224.0/encoding/base64url.ts'
-import { corsHeaders, createAdminClient, issueUserToken, issueRefreshToken, json, prepareUserForAuthentication } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, issueUserToken, issueRefreshToken, json, prepareUserForAuthentication } from '../_shared/provider-auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const { stableId, response } = await req.json()
@@ -79,8 +80,8 @@ serve(async (req) => {
     const token = await issueUserToken(effectiveUser, 'passkey')
     // К2: Выдаём refresh-токен
     const refreshToken = await issueRefreshToken(admin, effectiveUser.id, req.headers.get('user-agent'))
-    return json({ verified: true, token, refreshToken, user: effectiveUser })
+    return json({ verified: true, token, refreshToken, user: effectiveUser }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Не удалось войти по Passkey' }, 400)
+    return json({ error: error?.message || 'Не удалось войти по Passkey' }, 400, origin)
   }
 })

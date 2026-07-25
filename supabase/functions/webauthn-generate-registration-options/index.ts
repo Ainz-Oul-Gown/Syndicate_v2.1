@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { generateRegistrationOptions } from 'npm:@simplewebauthn/server'
-import { corsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
 
 function readBearer(req: Request) {
   const header = req.headers.get('authorization') || ''
@@ -8,15 +8,16 @@ function readBearer(req: Request) {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const { name, stableId } = await req.json()
     if (!Number.isSafeInteger(stableId) || stableId <= 0) throw new Error('Некорректный ID пользователя')
     const cleanName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 120) : 'User'
-    const origin = req.headers.get('origin') || 'http://localhost:3000'
-    const rpID = new URL(origin).hostname
+    const requestOrigin = req.headers.get('origin') || 'http://localhost:3000'
+    const rpID = new URL(requestOrigin).hostname
     const admin = createAdminClient()
 
     const { data: existingUser, error: userError } = await admin
@@ -72,7 +73,7 @@ serve(async (req) => {
       challenge: options.challenge,
       stableId,
       userId: existingUser?.id || null,
-      origin,
+      origin: requestOrigin,
       rpID,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     })
@@ -83,8 +84,8 @@ serve(async (req) => {
     })
     if (challengeError) throw challengeError
 
-    return json(options)
+    return json(options, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Не удалось создать Passkey challenge' }, 400)
+    return json({ error: error?.message || 'Не удалось создать Passkey challenge' }, 400, origin)
   }
 })

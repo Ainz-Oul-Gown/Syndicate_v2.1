@@ -1,9 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { corsHeaders, createAdminClient, json } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json } from '../_shared/provider-auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
 
   try {
     const body = await req.json()
@@ -20,11 +21,11 @@ serve(async (req) => {
       .maybeSingle()
     if (error) throw error
     // Единый generic-ответ: не раскрываем existence/status/unavailable — предотвращает user enumeration (В1)
-    if (!user) return json({ user: null })
+    if (!user) return json({ user: null }, 200, origin)
 
     const state = user.account_state || (user.status === 'blocked' ? 'blocked' : 'active')
     if (state === 'blocked' || state === 'deleted' || user.status === 'blocked') {
-      return json({ user: null })
+      return json({ user: null }, 200, origin)
     }
 
     return json({
@@ -35,8 +36,8 @@ serve(async (req) => {
         public_key: user.public_key,
         account_state: state,
       },
-    })
+    }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Не удалось получить профиль' }, 400)
+    return json({ error: error?.message || 'Не удалось получить профиль' }, 400, origin)
   }
 })
