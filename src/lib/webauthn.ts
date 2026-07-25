@@ -94,14 +94,17 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     hints: ['client-device'],
   } as any;
 
-  // Force platform authenticator (fingerprint/FaceID) without extra options.
-  // authenticatorAttachment:'platform' is REQUIRED — without it, the browser
-  // offers QR/NFC cross-device flow instead of biometric on Android.
-  // hints:['client-device'] reinforces this preference.
+  // Match the reference project EXACTLY (from the article):
+  // - authenticatorAttachment: 'platform' (force fingerprint/FaceID)
+  // - userVerification: 'preferred'
+  // - NO residentKey (the reference project doesn't set it)
   publicKey.authenticatorSelection = {
     authenticatorAttachment: 'platform',
     userVerification: 'preferred',
   };
+  // Remove residentKey — it causes "credential manager" errors on some Android devices
+  // when combined with authenticatorAttachment: 'platform'
+  delete publicKey.authenticatorSelection.residentKey;
 
   // Add excludeCredentials if present
   if (optionsJSON.excludeCredentials?.length) {

@@ -669,11 +669,9 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         
         let attResp;
         try {
-          // Use server-generated options directly without client modifications.
-          // The server sets authenticatorSelection (platform), userVerification (preferred),
-          // and rp.id correctly. Client-side modifications (deleting rp.id, overwriting
-          // authenticatorSelection) break the browser's ability to find the platform
-          // authenticator (fingerprint/FaceID) and cause NFC/USB key prompts instead.
+          // nativeStartRegistration forces authenticatorAttachment:'platform' +
+          // userVerification:'preferred' (matching reference project) and adds
+          // hints:['client-device'] to get fingerprint prompt instead of NFC/USB.
           attResp = await nativeStartRegistration(options);
         } catch (e: any) {
           throw new Error('Не удалось зарегистрировать Passkey. Убедитесь, что отпечаток пальца или FaceID настроены на вашем устройстве. (' + e.message + ')');

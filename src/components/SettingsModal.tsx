@@ -370,30 +370,10 @@ hapticImpact("selection");
           if (options.error) throw new Error(options.error);
 
           // Start Passkey Registration in browser.
-          // Use server-generated options directly. The server sets
-          // authenticatorSelection (platform), userVerification (preferred),
-          // and rp.id correctly. Client-side modifications (deleting authenticatorAttachment,
-          // overwriting userVerification, setting residentKey to required) break
-          // the browser's ability to find the platform authenticator (fingerprint/FaceID)
-          // and cause NFC/USB key prompts instead.
-          let attResp;
-          try {
-            attResp = await nativeStartRegistration(options);
-          } catch (e1: any) {
-            console.warn('WebAuthn registration with server options failed, trying fallback...', e1);
-            try {
-              // Fallback: ensure safe defaults without authenticatorAttachment
-              const fallbackOptions = JSON.parse(JSON.stringify(options));
-              if (fallbackOptions.authenticatorSelection) {
-                delete fallbackOptions.authenticatorSelection.authenticatorAttachment;
-                fallbackOptions.authenticatorSelection.residentKey = 'preferred';
-                fallbackOptions.authenticatorSelection.userVerification = 'preferred';
-              }
-              attResp = await nativeStartRegistration(fallbackOptions);
-            } catch (e2: any) {
-              throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или FaceID. Ошибка: ' + e2.message);
-            }
-          }
+          // nativeStartRegistration forces authenticatorAttachment:'platform' +
+          // userVerification:'preferred' (matching reference project) and adds
+          // hints:['client-device'] to get fingerprint prompt instead of NFC/USB.
+          const attResp = await nativeStartRegistration(options);
 
           const { data: verifyData, error: verifyErr } = await supabaseClient.functions.invoke('webauthn-verify-registration', {
           body: { 
