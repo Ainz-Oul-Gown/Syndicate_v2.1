@@ -380,10 +380,19 @@ hapticImpact("selection");
           try {
             attResp = await nativeStartRegistration(options);
           } catch (e1: any) {
-            // No fallback needed — nativeStartRegistration uses server options as-is.
-            // Previous fallback stripped authenticatorAttachment + set userVerification='preferred',
-            // which caused a second fingerprint prompt on Android.
-            throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или FaceID. Ошибка: ' + e1.message);
+            console.warn('WebAuthn registration with server options failed, trying fallback...', e1);
+            try {
+              // Fallback: ensure safe defaults without authenticatorAttachment
+              const fallbackOptions = JSON.parse(JSON.stringify(options));
+              if (fallbackOptions.authenticatorSelection) {
+                delete fallbackOptions.authenticatorSelection.authenticatorAttachment;
+                fallbackOptions.authenticatorSelection.residentKey = 'preferred';
+                fallbackOptions.authenticatorSelection.userVerification = 'preferred';
+              }
+              attResp = await nativeStartRegistration(fallbackOptions);
+            } catch (e2: any) {
+              throw new Error('Регистрация Passkey не удалась. Убедитесь, что на вашем устройстве настроен отпечаток пальца или FaceID. Ошибка: ' + e2.message);
+            }
           }
 
           const { data: verifyData, error: verifyErr } = await supabaseClient.functions.invoke('webauthn-verify-registration', {
