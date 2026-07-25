@@ -474,42 +474,34 @@ export default function SettingsModal({
     setShowPanicConfirm(true);
   };
 
-  /* ── sub-screen routing ── */
-
-  if (activeScreen === 'currencies') {
-    return (
+  return (
+    <>
+    {/* ── External screens (full-screen wrappers) ── */}
+    {activeScreen === 'currencies' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <CurrenciesScreen userId={userId} onBack={() => setActiveScreen('main')} />
       </div>
-    );
-  }
-  if (activeScreen === 'devices') {
-    return (
+    )}
+    {activeScreen === 'devices' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <DevicesScreen userId={userId} onBack={() => setActiveScreen('main')} />
       </div>
-    );
-  }
-  if (activeScreen === 'storage') {
-    return (
+    )}
+    {activeScreen === 'storage' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <StorageScreen onBack={() => setActiveScreen('main')} />
       </div>
-    );
-  }
-  if (activeScreen === 'ai') {
-    return (
+    )}
+    {activeScreen === 'ai' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <AiScreen onBack={() => setActiveScreen('main')} worker={worker} />
       </div>
-    );
-  }
+    )}
 
-  /* ════════════════════════════════════════════════════════════════════
+  {/* ════════════════════════════════════════════════════════════════════
      SUB-PAGE: ОФОРМЛЕНИЕ
-     ════════════════════════════════════════════════════════════════════ */
-  if (activeScreen === 'appearance') {
-    return (
+     ════════════════════════════════════════════════════════════════════ */}
+    {activeScreen === 'appearance' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
@@ -605,14 +597,12 @@ export default function SettingsModal({
           </div>
         </div>
       </div>
-    );
-  }
+    )}
 
-  /* ════════════════════════════════════════════════════════════════════
+  {/* ════════════════════════════════════════════════════════════════════
      SUB-PAGE: БЕЗОПАСНОСТЬ
-     ════════════════════════════════════════════════════════════════════ */
-  if (activeScreen === 'security') {
-    return (
+     ════════════════════════════════════════════════════════════════════ */}
+    {activeScreen === 'security' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
@@ -759,14 +749,12 @@ export default function SettingsModal({
           </div>
         </div>
       </div>
-    );
-  }
+    )}
 
-  /* ════════════════════════════════════════════════════════════════════
+  {/* ════════════════════════════════════════════════════════════════════
      SUB-PAGE: ИНВАЙТЫ
-     ════════════════════════════════════════════════════════════════════ */
-  if (activeScreen === 'invites') {
-    return (
+     ════════════════════════════════════════════════════════════════════ */}
+    {activeScreen === 'invites' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
@@ -828,255 +816,256 @@ export default function SettingsModal({
           </div>
         </div>
       </div>
-    );
-  }
+    )}
 
-  /* ════════════════════════════════════════════════════════════════════
+  {/* ════════════════════════════════════════════════════════════════════
      MAIN SCREEN
-     ════════════════════════════════════════════════════════════════════ */
-  return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
-        <button
-          onClick={onClose}
-          className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <Settings className="w-5 h-5 text-primary" />
-        <span className="font-bold font-display text-slate-200 text-lg tracking-tight">Настройки</span>
-      </div>
+     ════════════════════════════════════════════════════════════════════ */}
+    {(activeScreen === 'main' || activeScreen === 'danger') && (
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <Settings className="w-5 h-5 text-primary" />
+          <span className="font-bold font-display text-slate-200 text-lg tracking-tight">Настройки</span>
+        </div>
 
-      {/* Scrollable Content */}
-      <div className="flex-grow overflow-y-auto px-5 py-4 scrollbar-none">
-        <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
+        {/* Scrollable Content */}
+        <div className="flex-grow overflow-y-auto px-5 py-4 scrollbar-none">
+          <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
 
-          {/* ── Profile ── */}
-          <div className="flex items-center gap-3 py-2 w-full">
-            {/* Avatar — left */}
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-white font-bold text-2xl flex items-center justify-center uppercase shadow-xl shadow-primary/20 select-none ring-3 ring-slate-900/60 shrink-0">
-              {userName ? userName.charAt(0) : '?'}
-            </div>
+            {/* ── Profile ── */}
+            <div className="flex items-center gap-3 py-2 w-full">
+              {/* Avatar — left */}
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-white font-bold text-2xl flex items-center justify-center uppercase shadow-xl shadow-primary/20 select-none ring-3 ring-slate-900/60 shrink-0">
+                {userName ? userName.charAt(0) : '?'}
+              </div>
 
-            {/* Name + ID + status — right */}
-            <div className="flex flex-col min-w-0 flex-grow">
-              {/* Name with edit */}
-              {isEditingName ? (
-                <div className="flex flex-col gap-2 animate-fade-in">
+              {/* Name + ID + status — right */}
+              <div className="flex flex-col min-w-0 flex-grow">
+                {/* Name with edit */}
+                {isEditingName ? (
+                  <div className="flex flex-col gap-2 animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => { setNameError(null); setNewName(e.target.value); }}
+                        placeholder="Новое имя..."
+                        className="flex-grow bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/60 min-w-0"
+                        maxLength={25}
+                      />
+                      <button
+                        onClick={handleSaveName}
+                        className="bg-primary hover:bg-primary-hover text-white font-bold text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
+                      >
+                        ОК
+                      </button>
+                      <button
+                        onClick={() => setIsEditingName(false)}
+                        className="bg-slate-900 border border-slate-800 hover:text-slate-300 text-slate-400 text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                    {nameError && (
+                      <span className="text-[10px] text-rose-400 font-semibold flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {nameError}
+                      </span>
+                    )}
+                  </div>
+                ) : (
                   <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => { setNameError(null); setNewName(e.target.value); }}
-                      placeholder="Новое имя..."
-                      className="flex-grow bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/60 min-w-0"
-                      maxLength={25}
-                    />
+                    <span className="font-bold text-slate-100 text-lg tracking-tight truncate">{userName}</span>
                     <button
-                      onClick={handleSaveName}
-                      className="bg-primary hover:bg-primary-hover text-white font-bold text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
+                      onClick={handleStartEditName}
+                      className="text-slate-500 hover:text-slate-300 transition p-1 cursor-pointer shrink-0"
+                      title="Изменить имя"
                     >
-                      ОК
-                    </button>
-                    <button
-                      onClick={() => setIsEditingName(false)}
-                      className="bg-slate-900 border border-slate-800 hover:text-slate-300 text-slate-400 text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
-                    >
-                      Отмена
+                      <Edit2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  {nameError && (
-                    <span className="text-[10px] text-rose-400 font-semibold flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> {nameError}
+                )}
+
+                {/* ID — tap to copy */}
+                {!isEditingName && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(userId.toString());
+                      setCopiedId(true);
+                      setTimeout(() => setCopiedId(false), 2000);
+                      hapticImpact("success");
+                    }}
+                    className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition cursor-pointer active:scale-95 mt-0.5"
+                  >
+                    <span className="text-[11px] font-mono font-bold">{userId}</span>
+                    {copiedId ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
+                  </button>
+                )}
+
+                {/* Status */}
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                  <span className="text-[10px] text-primary font-mono tracking-wider font-semibold uppercase">
+                    Канал защищен
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Menu List ── */}
+            <div className="w-full bg-slate-900/20 border border-slate-900/60 rounded-2xl overflow-hidden divide-y divide-slate-900/60">
+              {/* Оформление */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('appearance'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Palette className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Оформление</span>
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
+
+              {/* Безопасность */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('security'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Безопасность</span>
+                <div className="flex items-center gap-2">
+                  {(hasPin || hasPasskey) && (
+                    <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
+                      {hasPin && hasPasskey ? '2 ON' : '1 ON'}
                     </span>
                   )}
+                  <ChevronRight className="w-4 h-4 text-slate-600" />
                 </div>
-              ) : (
+              </button>
+
+              {/* Мои монеты */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('currencies'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <Coins className="w-4.5 h-4.5 text-amber-400" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Мои монеты</span>
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
+
+              {/* Устройства */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('devices'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                  <Smartphone className="w-4.5 h-4.5 text-blue-400" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Устройства</span>
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
+
+              {/* Уведомления — inline toggle */}
+              <div className="flex items-center gap-3.5 p-3.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <Bell className="w-4.5 h-4.5 text-amber-400" />
+                </div>
+                <div className="flex-grow min-w-0">
+                  <span className="text-sm font-medium text-slate-200 block">Уведомления</span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    {pushState === 'unsupported' ? 'Не поддерживаются' :
+                     pushState === 'denied' ? 'Заблокированы' :
+                     pushState === 'enabled' ? 'Активны' : 'Выкл.'}
+                  </span>
+                </div>
+                {pushBusy ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pushState === 'enabled'}
+                      onChange={handlePushToggle}
+                      disabled={pushBusy || pushState === 'unsupported'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5.5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-200 after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white" />
+                  </label>
+                )}
+              </div>
+
+              {/* Инвайты */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('invites'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Users className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Инвайты</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-100 text-lg tracking-tight truncate">{userName}</span>
-                  <button
-                    onClick={handleStartEditName}
-                    className="text-slate-500 hover:text-slate-300 transition p-1 cursor-pointer shrink-0"
-                    title="Изменить имя"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
+                  {myInvites.length > 0 && (
+                    <span className="text-[9px] font-mono font-bold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                      {myInvites.length}
+                    </span>
+                  )}
+                  <ChevronRight className="w-4 h-4 text-slate-600" />
                 </div>
-              )}
+              </button>
 
-              {/* ID — tap to copy */}
-              {!isEditingName && (
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(userId.toString());
-                    setCopiedId(true);
-                    setTimeout(() => setCopiedId(false), 2000);
-                    hapticImpact("success");
-                  }}
-                  className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition cursor-pointer active:scale-95 mt-0.5"
-                >
-                  <span className="text-[11px] font-mono font-bold">{userId}</span>
-                  {copiedId ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
-                </button>
-              )}
-
-              {/* Status */}
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                <span className="text-[10px] text-primary font-mono tracking-wider font-semibold uppercase">
-                  Канал защищен
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Menu List ── */}
-          <div className="w-full bg-slate-900/20 border border-slate-900/60 rounded-2xl overflow-hidden divide-y divide-slate-900/60">
-            {/* Оформление */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('appearance'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <Palette className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Оформление</span>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-
-            {/* Безопасность */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('security'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Безопасность</span>
-              <div className="flex items-center gap-2">
-                {(hasPin || hasPasskey) && (
-                  <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
-                    {hasPin && hasPasskey ? '2 ON' : '1 ON'}
-                  </span>
-                )}
+              {/* Кэш и память */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('storage'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                  <Database className="w-4.5 h-4.5 text-purple-400" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Кэш и память</span>
                 <ChevronRight className="w-4 h-4 text-slate-600" />
-              </div>
-            </button>
+              </button>
 
-            {/* Мои монеты */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('currencies'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <Coins className="w-4.5 h-4.5 text-amber-400" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Мои монеты</span>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-
-            {/* Устройства */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('devices'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                <Smartphone className="w-4.5 h-4.5 text-blue-400" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Устройства</span>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-
-            {/* Уведомления — inline toggle */}
-            <div className="flex items-center gap-3.5 p-3.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <Bell className="w-4.5 h-4.5 text-amber-400" />
-              </div>
-              <div className="flex-grow min-w-0">
-                <span className="text-sm font-medium text-slate-200 block">Уведомления</span>
-                <span className="text-[10px] text-slate-500 block mt-0.5">
-                  {pushState === 'unsupported' ? 'Не поддерживаются' :
-                   pushState === 'denied' ? 'Заблокированы' :
-                   pushState === 'enabled' ? 'Активны' : 'Выкл.'}
-                </span>
-              </div>
-              {pushBusy ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pushState === 'enabled'}
-                    onChange={handlePushToggle}
-                    disabled={pushBusy || pushState === 'unsupported'}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-5.5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-200 after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white" />
-                </label>
-              )}
+              {/* Нейро-модуль */}
+              <button
+                onClick={() => { hapticImpact("selection"); setActiveScreen('ai'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                  <Brain className="w-4.5 h-4.5 text-rose-500" />
+                </div>
+                <span className="text-sm font-medium text-slate-200 flex-grow">Нейро-модуль</span>
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
             </div>
 
-            {/* Инвайты */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('invites'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <Users className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Инвайты</span>
-              <div className="flex items-center gap-2">
-                {myInvites.length > 0 && (
-                  <span className="text-[9px] font-mono font-bold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
-                    {myInvites.length}
-                  </span>
-                )}
+            {/* ── Danger Zone ── */}
+            <div className="w-full bg-slate-900/20 border border-rose-500/10 rounded-2xl overflow-hidden divide-y divide-slate-900/60">
+              <button
+                onClick={() => { hapticImpact("warning"); setActiveScreen('security'); }}
+                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-rose-500/5 active:bg-rose-500/10 text-rose-400 transition duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                  <Skull className="w-4.5 h-4.5 text-rose-500" />
+                </div>
+                <span className="text-sm font-medium flex-grow">Стирание и деактивация</span>
                 <ChevronRight className="w-4 h-4 text-slate-600" />
-              </div>
-            </button>
-
-            {/* Кэш и память */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('storage'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                <Database className="w-4.5 h-4.5 text-purple-400" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Кэш и память</span>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-
-            {/* Нейро-модуль */}
-            <button
-              onClick={() => { hapticImpact("selection"); setActiveScreen('ai'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                <Brain className="w-4.5 h-4.5 text-rose-500" />
-              </div>
-              <span className="text-sm font-medium text-slate-200 flex-grow">Нейро-модуль</span>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-          </div>
-
-          {/* ── Danger Zone ── */}
-          <div className="w-full bg-slate-900/20 border border-rose-500/10 rounded-2xl overflow-hidden divide-y divide-slate-900/60">
-            <button
-              onClick={() => { hapticImpact("warning"); setActiveScreen('security'); }}
-              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-rose-500/5 active:bg-rose-500/10 text-rose-400 transition duration-150 cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                <Skull className="w-4.5 h-4.5 text-rose-500" />
-              </div>
-              <span className="text-sm font-medium flex-grow">Стирание и деактивация</span>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+    )}
 
       {/* ════════════════════════════════════════════════════════════════
-         MODALS (shared across sub-pages)
+         MODALS — z-[1100/1200], render always, above all screens
          ════════════════════════════════════════════════════════════════ */}
 
       {/* Biometric Info */}
@@ -1319,6 +1308,6 @@ export default function SettingsModal({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
