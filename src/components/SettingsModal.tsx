@@ -34,7 +34,7 @@ import DevicesScreen from './DevicesScreen';
 import StorageScreen from './StorageScreen';
 import AiScreen from './AiScreen';
 import { applyTheme, applyThemeMode, THEME_COLORS, type ThemeMode } from '../lib/theme';
-import { getHapticsPower, setHapticsPower, type HapticsPower } from '../lib/haptics';
+import { getHapticsMultiplier, setHapticsMultiplier, hapticDemo } from '../lib/haptics';
 import { supabaseClient } from '../lib/supabase';
 import * as idbKeyval from 'idb-keyval';
 import { disablePushNotifications, enablePushNotifications, getPushState, type PushState } from '../lib/pushNotifications';
@@ -133,7 +133,7 @@ export default function SettingsModal({
   const [accentColor, setAccentColor] = useState('#0A84FF');
   const [themeMode, setThemeMode] = useState<ThemeMode>('auto');
   const [haptics, setHaptics] = useState(true);
-  const [hapticsPower, setHapticsPowerState] = useState<HapticsPower>('normal');
+  const [hapticsPower, setHapticsPowerState] = useState(getHapticsMultiplier());
   const [hasPin, setHasPin] = useState(false);
   const [hasPanicPin, setHasPanicPin] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
@@ -206,7 +206,7 @@ export default function SettingsModal({
 
     // Read haptics
     setHaptics(localStorage.getItem('synd_haptics') !== 'off');
-    setHapticsPowerState(getHapticsPower());
+    setHapticsPowerState(getHapticsMultiplier());
 
     // Read PIN status
     setHasPin(!!localStorage.getItem('synd_pin_hash'));
@@ -362,10 +362,14 @@ export default function SettingsModal({
     hapticImpact("medium");
   };
 
-  const handleHapticsPowerChange = (power: HapticsPower) => {
-    setHapticsPowerState(power);
-    setHapticsPower(power);
-    hapticImpact(power === 'short' ? 'light' : power === 'long' ? 'heavy' : 'medium');
+  const handleHapticsPowerChange = (value: number) => {
+    const clamped = Math.max(0.5, Math.min(1.5, value));
+    setHapticsPowerState(clamped);
+    setHapticsMultiplier(clamped);
+  };
+
+  const handleHapticsPowerRelease = () => {
+    hapticDemo();
   };
 
   const handleTogglePasskey = async () => {
@@ -883,21 +887,41 @@ export default function SettingsModal({
 
                 {haptics && (
                   <div className="p-4">
-                    <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-2.5 block">Мощность</span>
-                    <div className="flex gap-2">
-                      {(['short', 'normal', 'long'] as HapticsPower[]).map((power) => (
-                        <button
-                          key={power}
-                          onClick={() => handleHapticsPowerChange(power)}
-                          className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer border ${
-                            hapticsPower === power
-                              ? 'bg-primary/15 border-primary/40 text-primary shadow-sm shadow-primary/10'
-                              : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800'
-                          }`}
-                        >
-                          {power === 'short' ? 'Короткая' : power === 'normal' ? 'Стандарт' : 'Длинная'}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Мощность</span>
+                      <span className="text-[11px] font-mono font-bold text-primary">{Math.round(hapticsPower * 100)}%</span>
+                    </div>
+                    {/* Slider track */}
+                    <div className="relative h-10 flex items-center">
+                      {/* Background track */}
+                      <div className="absolute inset-x-0 h-1.5 bg-slate-800 rounded-full" />
+                      {/* Filled track */}
+                      <div
+                        className="absolute h-1.5 bg-primary rounded-full transition-all"
+                        style={{ left: '0%', width: `${((hapticsPower - 0.5) / 1.0) * 100}%` }}
+                      />
+                      {/* Input */}
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={1.5}
+                        step={0.05}
+                        value={hapticsPower}
+                        onChange={(e) => handleHapticsPowerChange(parseFloat(e.target.value))}
+                        onMouseUp={handleHapticsPowerRelease}
+                        onTouchEnd={handleHapticsPowerRelease}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      {/* Custom thumb */}
+                      <div
+                        className="absolute w-5 h-5 bg-white rounded-full shadow-lg shadow-primary/30 border-2 border-primary pointer-events-none transition-all"
+                        style={{ left: `calc(${((hapticsPower - 0.5) / 1.0) * 100}% - 10px)` }}
+                      />
+                    </div>
+                    {/* Labels */}
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[9px] text-slate-600 font-mono">弱</span>
+                      <span className="text-[9px] text-slate-600 font-mono">强</span>
                     </div>
                   </div>
                 )}

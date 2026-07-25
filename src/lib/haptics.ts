@@ -1,29 +1,53 @@
 export type HapticsPower = 'short' | 'normal' | 'long';
 
-const POWER_LABELS: Record<HapticsPower, string> = {
-  short: 'Короткая',
-  normal: 'Стандартная',
-  long: 'Длинная',
-};
-
 const POWER_MULTIPLIER: Record<HapticsPower, number> = {
   short: 0.5,
   normal: 1,
   long: 1.5,
 };
 
+/**
+ * Read haptics multiplier (0.5–1.5) from localStorage.
+ * Stored as a plain number string, default 1.0.
+ */
+export function getHapticsMultiplier(): number {
+  const raw = localStorage.getItem('synd_haptics_multiplier');
+  if (raw !== null) {
+    const n = parseFloat(raw);
+    if (!isNaN(n) && n >= 0.5 && n <= 1.5) return n;
+  }
+  return 1.0;
+}
+
+export function setHapticsMultiplier(value: number) {
+  localStorage.setItem('synd_haptics_multiplier', Math.max(0.5, Math.min(1.5, value)).toString());
+}
+
+/** Legacy support — converts multiplier to old type for any remaining callers */
 export function getHapticsPower(): HapticsPower {
-  const v = localStorage.getItem('synd_haptics_power');
-  if (v === 'short' || v === 'long') return v;
+  const m = getHapticsMultiplier();
+  if (m <= 0.7) return 'short';
+  if (m >= 1.3) return 'long';
   return 'normal';
 }
 
 export function setHapticsPower(power: HapticsPower) {
-  localStorage.setItem('synd_haptics_power', power);
+  setHapticsMultiplier(POWER_MULTIPLIER[power]);
 }
 
-export function getHapticsPowerLabel(power: HapticsPower): string {
-  return POWER_LABELS[power] ?? POWER_LABELS.normal;
+/**
+ * Play a short demo vibration at the current power level.
+ * Used by the slider to show the user what the vibration feels like.
+ */
+export function hapticDemo() {
+  const m = getHapticsMultiplier();
+  if (!navigator.vibrate) return;
+  // A distinct pattern: medium impact + short pause + success
+  navigator.vibrate([
+    Math.round(60 * m),
+    Math.round(40 * m),
+    Math.round(80 * m),
+  ]);
 }
 
 export function hapticImpact(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection' = 'light') {
@@ -31,8 +55,7 @@ export function hapticImpact(type: 'light' | 'medium' | 'heavy' | 'success' | 'w
   if (!isHapticsEnabled) return;
 
   const tg = (window as any).Telegram?.WebApp;
-  const power = getHapticsPower();
-  const m = POWER_MULTIPLIER[power];
+  const m = getHapticsMultiplier();
 
   if (tg && typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('6.1') && tg.HapticFeedback) {
     if (type === 'light' || type === 'medium' || type === 'heavy') {
