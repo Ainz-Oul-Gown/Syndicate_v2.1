@@ -478,28 +478,28 @@ export default function SettingsModal({
 
   if (activeScreen === 'currencies') {
     return (
-      <div className="fixed inset-0 z-[1000] bg-slate-950 overflow-y-auto">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <CurrenciesScreen userId={userId} onBack={() => setActiveScreen('main')} />
       </div>
     );
   }
   if (activeScreen === 'devices') {
     return (
-      <div className="fixed inset-0 z-[1000] bg-slate-950 overflow-y-auto">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <DevicesScreen userId={userId} onBack={() => setActiveScreen('main')} />
       </div>
     );
   }
   if (activeScreen === 'storage') {
     return (
-      <div className="fixed inset-0 z-[1000] bg-slate-950 overflow-y-auto">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <StorageScreen onBack={() => setActiveScreen('main')} />
       </div>
     );
   }
   if (activeScreen === 'ai') {
     return (
-      <div className="fixed inset-0 z-[1000] bg-slate-950 overflow-y-auto">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
         <AiScreen onBack={() => setActiveScreen('main')} worker={worker} />
       </div>
     );
@@ -849,11 +849,11 @@ export default function SettingsModal({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-grow overflow-y-auto px-5 py-6 scrollbar-none">
-        <div className="flex flex-col items-center gap-5 max-w-md mx-auto w-full pb-10">
+      <div className="flex-grow overflow-y-auto px-5 py-4 scrollbar-none">
+        <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
 
           {/* ── Profile ── */}
-          <div className="flex items-center gap-4 pt-2 pb-4 w-full">
+          <div className="flex items-center gap-3 py-2 w-full">
             {/* Avatar — left */}
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-white font-bold text-2xl flex items-center justify-center uppercase shadow-xl shadow-primary/20 select-none ring-3 ring-slate-900/60 shrink-0">
               {userName ? userName.charAt(0) : '?'}
@@ -936,7 +936,7 @@ export default function SettingsModal({
             {/* Оформление */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('appearance'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                 <Palette className="w-4.5 h-4.5 text-primary" />
@@ -948,7 +948,7 @@ export default function SettingsModal({
             {/* Безопасность */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('security'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                 <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
@@ -967,7 +967,7 @@ export default function SettingsModal({
             {/* Мои монеты */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('currencies'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                 <Coins className="w-4.5 h-4.5 text-amber-400" />
@@ -979,7 +979,7 @@ export default function SettingsModal({
             {/* Устройства */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('devices'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                 <Smartphone className="w-4.5 h-4.5 text-blue-400" />
@@ -989,7 +989,7 @@ export default function SettingsModal({
             </button>
 
             {/* Уведомления — inline toggle */}
-            <div className="flex items-center gap-3.5 p-4">
+            <div className="flex items-center gap-3.5 p-3.5">
               <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                 <Bell className="w-4.5 h-4.5 text-amber-400" />
               </div>
@@ -1018,7 +1018,7 @@ export default function SettingsModal({
             {/* Инвайты */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('invites'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                 <Users className="w-4.5 h-4.5 text-primary" />
@@ -1037,7 +1037,7 @@ export default function SettingsModal({
             {/* Кэш и память */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('storage'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                 <Database className="w-4.5 h-4.5 text-purple-400" />
@@ -1049,12 +1049,26 @@ export default function SettingsModal({
             {/* Нейро-модуль */}
             <button
               onClick={() => { hapticImpact("selection"); setActiveScreen('ai'); }}
-              className="w-full flex items-center gap-3.5 p-4 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
             >
               <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
                 <Brain className="w-4.5 h-4.5 text-rose-500" />
               </div>
               <span className="text-sm font-medium text-slate-200 flex-grow">Нейро-модуль</span>
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+
+          {/* ── Danger Zone ── */}
+          <div className="w-full bg-slate-900/20 border border-rose-500/10 rounded-2xl overflow-hidden divide-y divide-slate-900/60">
+            <button
+              onClick={() => { hapticImpact("warning"); setActiveScreen('security'); }}
+              className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-rose-500/5 active:bg-rose-500/10 text-rose-400 transition duration-150 cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Skull className="w-4.5 h-4.5 text-rose-500" />
+              </div>
+              <span className="text-sm font-medium flex-grow">Стирание и деактивация</span>
               <ChevronRight className="w-4 h-4 text-slate-600" />
             </button>
           </div>
