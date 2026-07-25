@@ -139,6 +139,7 @@ export default function SettingsModal({
   const [showPanicConfirm, setShowPanicConfirm] = useState(false);
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [showWipeDeactivateInfo, setShowWipeDeactivateInfo] = useState(false);
   const [nameBlockedMsLeft, setNameBlockedMsLeft] = useState<number | null>(null);
   const [pushState, setPushState] = useState<PushState>('default');
   const [pushBusy, setPushBusy] = useState(false);
@@ -941,24 +942,40 @@ export default function SettingsModal({
               </div>
             </div>
 
-            {/* Panic Button */}
-            <button
-              onClick={() => { hapticImpact("warning"); handlePanicWipeClick(); }}
-              className="w-full flex items-center gap-3 p-4 text-left hover:bg-rose-500/5 active:bg-rose-500/10 text-rose-500 transition duration-150 cursor-pointer"
-            >
-              <Skull className="w-4.5 h-4.5 text-rose-500" />
-              <span className="text-sm font-semibold">Экстренное стирание данных (Wipe)</span>
-            </button>
-            <button
-              onClick={() => { hapticImpact("warning"); setShowDeactivateConfirm(true); }}
-              className="w-full flex items-center gap-3 p-4 text-left hover:bg-amber-500/5 active:bg-amber-500/10 text-amber-400 transition duration-150 cursor-pointer"
-            >
-              <Lock className="w-4.5 h-4.5 text-amber-400" />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Деактивировать аккаунт</span>
-                <span className="text-[10px] text-slate-500 mt-0.5">Сессии и устройства будут отозваны; следующий подтверждённый вход восстановит профиль.</span>
-              </div>
-            </button>
+            {/* Panic + Deactivate with shared info button */}
+            <div className="divide-y divide-slate-900">
+              <button
+                onClick={() => { hapticImpact("warning"); handlePanicWipeClick(); }}
+                className="w-full flex items-center gap-3 p-4 text-left hover:bg-rose-500/5 active:bg-rose-500/10 text-rose-500 transition duration-150 cursor-pointer"
+              >
+                <Skull className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                <span className="text-sm font-semibold flex-grow">Экстренное стирание данных (Wipe)</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); hapticImpact("selection"); setShowWipeDeactivateInfo(true); }}
+                  className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-500 hover:text-slate-300 transition shrink-0 cursor-pointer"
+                  title="Чем отличается от деактивации?"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </button>
+              <button
+                onClick={() => { hapticImpact("warning"); setShowDeactivateConfirm(true); }}
+                className="w-full flex items-center gap-3 p-4 text-left hover:bg-amber-500/5 active:bg-amber-500/10 text-amber-400 transition duration-150 cursor-pointer"
+              >
+                <Lock className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                <div className="flex flex-col flex-grow min-w-0">
+                  <span className="text-sm font-semibold">Деактивировать аккаунт</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">Сессии и устройства будут отозваны; следующий подтверждённый вход восстановит профиль.</span>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); hapticImpact("selection"); setShowWipeDeactivateInfo(true); }}
+                  className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-500 hover:text-slate-300 transition shrink-0 cursor-pointer"
+                  title="Чем отличается от стирания?"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1124,6 +1141,82 @@ export default function SettingsModal({
                 ПОНЯТНО
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe vs Deactivate Info Modal */}
+      {showWipeDeactivateInfo && (
+        <div className="fixed inset-0 z-[1100] bg-slate-950/90 backdrop-blur-md flex flex-col justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/90 p-5 rounded-3xl flex flex-col gap-4 max-w-sm w-full mx-auto relative shadow-2xl overflow-y-auto max-h-[85vh] scrollbar-thin">
+            <h3 className="font-extrabold font-mono tracking-tight text-slate-100 text-base uppercase flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" /> Стирание vs Деактивация
+            </h3>
+
+            <div className="space-y-3.5 text-xs text-slate-300 leading-relaxed">
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                <p className="font-bold text-rose-400 mb-1.5 flex items-center gap-1.5">
+                  <Skull className="w-3.5 h-3.5" /> Экстренное стирание (Wipe)
+                </p>
+                <p>
+                  Полностью удаляет <strong>всё локально</strong> на этом устройстве: ключи шифрования, кэш чатов, медиафайлы, сессии авторизации (включая Google OAuth). Аккаунт на сервере <strong>остаётся активным</strong> — другие устройства продолжают работать.
+                </p>
+                <p className="mt-1.5 text-rose-400/80">
+                  <strong>Сценарий:</strong> устройство утеряно или скомпрометировано.
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <p className="font-bold text-amber-400 mb-1.5 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" /> Деактивация аккаунта
+                </p>
+                <p>
+                  Помечает аккаунт как <strong>deactivated</strong> на сервере, <strong>отзывает все сессии</strong> на всех устройствах, удаляет устройства, инвайты и auth-челленджи. Затем выполняет полную локальную очистку (как Wipe).
+                </p>
+                <p className="mt-1.5 text-amber-400/80">
+                  <strong>Сценарий:</strong> аккаунт скомпрометирован. Восстановление — через повторный вход с подтверждением личности.
+                </p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+                <table className="w-full text-[11px]">
+                  <tbody>
+                    <tr className="border-b border-slate-800">
+                      <td className="py-1.5 text-slate-500 font-mono"></td>
+                      <td className="py-1.5 text-center font-bold text-rose-400">Wipe</td>
+                      <td className="py-1.5 text-center font-bold text-amber-400">Деактивация</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/50">
+                      <td className="py-1.5 text-slate-500">Аккаунт на сервере</td>
+                      <td className="py-1.5 text-center text-emerald-400">Жив</td>
+                      <td className="py-1.5 text-center text-rose-400">Заблокирован</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/50">
+                      <td className="py-1.5 text-slate-500">Другие устройства</td>
+                      <td className="py-1.5 text-center text-emerald-400">Работают</td>
+                      <td className="py-1.5 text-center text-rose-400">Сброшены</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/50">
+                      <td className="py-1.5 text-slate-500">Восстановление</td>
+                      <td className="py-1.5 text-center text-slate-300">Логин</td>
+                      <td className="py-1.5 text-center text-slate-300">Логин + подтверждение</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 text-slate-500">Ключи E2EE</td>
+                      <td className="py-1.5 text-center text-rose-400">Удалены</td>
+                      <td className="py-1.5 text-center text-rose-400">Удалены</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { hapticImpact("selection"); setShowWipeDeactivateInfo(false); }}
+              className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono py-3 rounded-2xl transition cursor-pointer"
+            >
+              ПОНЯТНО
+            </button>
           </div>
         </div>
       )}
