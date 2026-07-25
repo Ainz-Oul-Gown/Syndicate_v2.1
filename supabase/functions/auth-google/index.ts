@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
-  allocateStableId, bindIdentity, consumeRegistrationInvite, corsHeaders,
+  allocateStableId, bindIdentity, consumeRegistrationInvite, getCorsHeaders,
   createAdminClient, findUserByCandidateIds, getIdentityUser, issueUserToken,
   issueRefreshToken, json, normalizePublicKeysPayload, prepareUserForAuthentication, stableNumericId,
   unwrapProviderVaultSecret, wrapProviderVaultSecret,
@@ -29,8 +29,9 @@ async function verifyFirebaseIdToken(idToken: string): Promise<FirebaseAccount> 
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  const origin = req.headers.get('Origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(origin) })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, origin)
   try {
     const body = await req.json()
     const idToken = typeof body.idToken === 'string' ? body.idToken : ''
@@ -82,13 +83,12 @@ serve(async (req) => {
       ? await unwrapProviderVaultSecret(identity.wrapped_vault_secret)
       : null
     const token = await issueUserToken(user, 'google')
-    // К2: Выдаём refresh-токен (30-мин access + 7-дневный refresh)
     const refreshToken = await issueRefreshToken(supabaseAdmin, user.id, req.headers.get('user-agent'))
     return json({
       token, refreshToken, stableId: user.tg_id, user,
       provider: { email: identity?.provider_email || email, vaultSecret, needsVaultMigration: !vaultSecret },
-    })
+    }, 200, origin)
   } catch (error: any) {
-    return json({ error: error?.message || 'Ошибка Google-аутентификации' }, 400)
+    return json({ error: error?.message || 'Ошибка Google-аутентификации' }, 400, origin)
   }
 })
