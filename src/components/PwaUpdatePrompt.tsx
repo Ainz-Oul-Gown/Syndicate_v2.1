@@ -4,13 +4,10 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { hapticImpact } from '../lib/haptics';
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
-const UPDATE_COOLDOWN_KEY = 'synd_pwa_last_update';
-const UPDATE_COOLDOWN_MS = 30_000; // 30 seconds after applying an update, ignore re-detection
 
 export default function PwaUpdatePrompt() {
   const [isApplying, setIsApplying] = useState(false);
   const [showModal, setShowModal] = useState(false);
-
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -18,15 +15,6 @@ export default function PwaUpdatePrompt() {
     immediate: true,
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
-
-      // After applying an update, skip re-checking for a cooldown period.
-      // This prevents the infinite loop where the newly-activated SW is
-      // immediately detected as "another update" by registration.update().
-      const lastUpdate = parseInt(localStorage.getItem(UPDATE_COOLDOWN_KEY) || '0', 10);
-      if (Date.now() - lastUpdate < UPDATE_COOLDOWN_MS) {
-        console.debug('[PWA] Update check skipped — cooldown active');
-        return;
-      }
 
       const checkForUpdate = () => {
         if (navigator.onLine) {
@@ -75,12 +63,38 @@ export default function PwaUpdatePrompt() {
     setIsApplying(true);
     hapticImpact('warning');
 
-    // Mark the cooldown so the re-registered SW doesn't trigger needRefresh
-    localStorage.setItem(UPDATE_COOLDOWN_KEY, Date.now().toString());
-    setNeedRefresh(false);
+    const forceReload = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('_v', Date.now().toString());
+      window.location.replace(url.toString());
+    };
 
-    // Standard Vite PWA update: skipWaiting → clients.claim → soft reload
-    updateServiceWorker(true);
+    const cleanupPromise = (async () => {
+      try {
+        if ('caches' in window) {
+          const names = await Promise.race([
+            caches.keys(),
+            new Promise<string[]>((r) => setTimeout(() => r([]), 1500)),
+          ]);
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+      } catch { /* ignore */ }
+
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await Promise.race([
+            navigator.serviceWorker.getRegistrations(),
+            new Promise<any[]>((r) => setTimeout(() => r([]), 1500)),
+          ]);
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch { /* ignore */ }
+    })();
+
+    Promise.race([
+      cleanupPromise,
+      new Promise((r) => setTimeout(r, 3000)),
+    ]).then(forceReload);
   };
 
   const dismiss = () => {
@@ -103,7 +117,7 @@ export default function PwaUpdatePrompt() {
             Доступно обновление
           </h3>
           <p className="text-xs text-slate-400 leading-relaxed max-w-[240px]">
-            Новая версия приложения готова к установке. Обновление произойдёт без потери данных.
+            Новая версия приложения готова к установке. Рекомендуется очистить кэш для корректной работы.
           </p>
         </div>
 
@@ -121,7 +135,7 @@ export default function PwaUpdatePrompt() {
               </>
             ) : (
               <>
-                <RefreshCw className="w-4 h-4" /> Обновить приложение
+                <RefreshCw className="w-4 h-4" /> Очистить кэш и обновить
               </>
             )}
           </button>
