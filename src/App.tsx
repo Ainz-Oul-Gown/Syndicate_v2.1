@@ -1,4 +1,4 @@
-import { readRefreshToken, writeRefreshToken } from './lib/sessionStorage';
+import { readRefreshToken, writeRefreshToken, readAccessToken } from './lib/sessionStorage';
 import { LoginScreen } from './components/LoginScreen';
 import type { StartupState } from './components/StartupScreen';
 import { useState, useEffect, useRef } from 'react';
@@ -1347,6 +1347,14 @@ export default function App() {
                 const cachedGroups = localStorage.getItem('synd_cached_groups');
                 if (cachedUsers) setFriends(JSON.parse(cachedUsers));
                 if (cachedGroups) setGroupChats(JSON.parse(cachedGroups));
+
+                // Restore access token from IndexedDB (survives PWA cache wipe + reload)
+                if (!getSupabaseToken()) {
+                    const persistedToken = await readAccessToken();
+                    if (persistedToken && isSupabaseTokenUsable(persistedToken)) {
+                        setSupabaseToken(persistedToken);
+                    }
+                }
 
                 const authData = await authUser();
                 const activeUser = authData || currentUser;

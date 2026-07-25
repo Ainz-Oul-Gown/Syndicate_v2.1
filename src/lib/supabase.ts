@@ -1,12 +1,12 @@
 /**
  * К2: Supabase клиент с auto-refresh access-токена.
  *
- * Access-токен (30 мин) хранится ТОЛЬКО в памяти.
+ * Access-токен (30 мин) хранится в памяти (currentToken) + IndexedDB (backup).
  * Refresh-токен (7 дней) хранится в localStorage и ротируется при каждом use.
  * При 401: автоматический refresh через auth-refresh endpoint.
  */
 import { createClient } from '@supabase/supabase-js';
-import { readRefreshToken, writeRefreshToken } from './sessionStorage';
+import { readRefreshToken, writeRefreshToken, writeAccessToken, clearAccessToken } from './sessionStorage';
 import { createOfflineError, isOnline, reportNetworkFailure, reportNetworkSuccess } from './network';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
@@ -187,7 +187,8 @@ export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 export function setSupabaseToken(token: string | null) {
   currentToken = token;
   if (token) {
-    // НЕ сохраняем в localStorage — только в памяти
+    // Пишем в IndexedDB как backup для восстановления после PWA update
+    writeAccessToken(token);
     scheduleRefresh(token);
     // @ts-ignore - access to internal realtime client to set auth
     if (supabaseClient.realtime && typeof supabaseClient.realtime.setAuth === 'function') {
@@ -196,6 +197,8 @@ export function setSupabaseToken(token: string | null) {
     }
   } else {
     if (refreshTimer) clearTimeout(refreshTimer);
+    // Удаляем backup из IndexedDB
+    clearAccessToken();
     // @ts-ignore
     if (supabaseClient.realtime && typeof supabaseClient.realtime.setAuth === 'function') {
       // @ts-ignore
