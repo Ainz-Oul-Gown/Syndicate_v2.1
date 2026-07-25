@@ -34,6 +34,7 @@ import DevicesScreen from './DevicesScreen';
 import StorageScreen from './StorageScreen';
 import AiScreen from './AiScreen';
 import { applyTheme, applyThemeMode, THEME_COLORS, type ThemeMode } from '../lib/theme';
+import { getHapticsPower, setHapticsPower, type HapticsPower } from '../lib/haptics';
 import { supabaseClient } from '../lib/supabase';
 import * as idbKeyval from 'idb-keyval';
 import { disablePushNotifications, enablePushNotifications, getPushState, type PushState } from '../lib/pushNotifications';
@@ -132,6 +133,7 @@ export default function SettingsModal({
   const [accentColor, setAccentColor] = useState('#0A84FF');
   const [themeMode, setThemeMode] = useState<ThemeMode>('auto');
   const [haptics, setHaptics] = useState(true);
+  const [hapticsPower, setHapticsPowerState] = useState<HapticsPower>('normal');
   const [hasPin, setHasPin] = useState(false);
   const [hasPanicPin, setHasPanicPin] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
@@ -204,6 +206,7 @@ export default function SettingsModal({
 
     // Read haptics
     setHaptics(localStorage.getItem('synd_haptics') !== 'off');
+    setHapticsPowerState(getHapticsPower());
 
     // Read PIN status
     setHasPin(!!localStorage.getItem('synd_pin_hash'));
@@ -356,8 +359,13 @@ export default function SettingsModal({
   const handleHapticsToggle = (checked: boolean) => {
     setHaptics(checked);
     localStorage.setItem('synd_haptics', checked ? 'on' : 'off');
-
     hapticImpact("medium");
+  };
+
+  const handleHapticsPowerChange = (power: HapticsPower) => {
+    setHapticsPowerState(power);
+    setHapticsPower(power);
+    hapticImpact(power === 'short' ? 'light' : power === 'long' ? 'heavy' : 'medium');
   };
 
   const handleTogglePasskey = async () => {
@@ -856,7 +864,7 @@ export default function SettingsModal({
             {/* Sound & Haptics */}
             <div>
               <span className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-widest mb-2.5 block px-1">Звук и вибрация</span>
-              <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl overflow-hidden">
+              <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl overflow-hidden divide-y divide-slate-900">
                 <div className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
                     <Smartphone className="w-4.5 h-4.5 text-slate-400" />
@@ -872,6 +880,27 @@ export default function SettingsModal({
                     <div className="w-10 h-5.5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-200 after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white" />
                   </label>
                 </div>
+
+                {haptics && (
+                  <div className="p-4">
+                    <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-2.5 block">Мощность</span>
+                    <div className="flex gap-2">
+                      {(['short', 'normal', 'long'] as HapticsPower[]).map((power) => (
+                        <button
+                          key={power}
+                          onClick={() => handleHapticsPowerChange(power)}
+                          className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                            hapticsPower === power
+                              ? 'bg-primary/15 border-primary/40 text-primary shadow-sm shadow-primary/10'
+                              : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800'
+                          }`}
+                        >
+                          {power === 'short' ? 'Короткая' : power === 'normal' ? 'Стандарт' : 'Длинная'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

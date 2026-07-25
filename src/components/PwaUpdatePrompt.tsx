@@ -63,42 +63,12 @@ export default function PwaUpdatePrompt() {
     setIsApplying(true);
     hapticImpact('warning');
 
-    // Best-effort cleanup with timeouts, then force reload
-    const forceReload = () => {
-      // Cache-bust to bypass any remaining cached assets
-      const url = new URL(window.location.href);
-      url.searchParams.set('_v', Date.now().toString());
-      window.location.replace(url.toString());
-    };
-
-    // Try to clear caches and unregister SW, but always reload after 2s max
-    const cleanupPromise = (async () => {
-      try {
-        if ('caches' in window) {
-          const names = await Promise.race([
-            caches.keys(),
-            new Promise<string[]>((r) => setTimeout(() => r([]), 1500)),
-          ]);
-          await Promise.all(names.map((n) => caches.delete(n)));
-        }
-      } catch { /* ignore */ }
-
-      try {
-        if ('serviceWorker' in navigator) {
-          const regs = await Promise.race([
-            navigator.serviceWorker.getRegistrations(),
-            new Promise<any[]>((r) => setTimeout(() => r([]), 1500)),
-          ]);
-          await Promise.all(regs.map((r) => r.unregister()));
-        }
-      } catch { /* ignore */ }
-    })();
-
-    // Guarantee reload within 3 seconds even if cleanup hangs
-    Promise.race([
-      cleanupPromise,
-      new Promise((r) => setTimeout(r, 3000)),
-    ]).then(forceReload);
+    // Use the standard Vite PWA mechanism:
+    // updateServiceWorker(true) calls skipWaiting() + clients.claim()
+    // on the new SW, then does a soft reload.
+    // The new SW is active BEFORE reload, so auth-refresh works
+    // because cached assets and the precache manifest are served correctly.
+    updateServiceWorker(true);
   };
 
   const dismiss = () => {
@@ -121,7 +91,7 @@ export default function PwaUpdatePrompt() {
             Доступно обновление
           </h3>
           <p className="text-xs text-slate-400 leading-relaxed max-w-[240px]">
-            Новая версия приложения готова к установке. Рекомендуется очистить кэш для корректной работы.
+            Новая версия приложения готова к установке. Обновление произойдёт без потери данных.
           </p>
         </div>
 
@@ -139,7 +109,7 @@ export default function PwaUpdatePrompt() {
               </>
             ) : (
               <>
-                <RefreshCw className="w-4 h-4" /> Очистить кэш и обновить
+                <RefreshCw className="w-4 h-4" /> Обновить приложение
               </>
             )}
           </button>
