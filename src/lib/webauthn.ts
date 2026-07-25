@@ -94,13 +94,15 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     hints: ['client-device'],
   } as any;
 
-  // Match the reference project EXACTLY (from the article):
-  // - authenticatorAttachment: 'platform' (force fingerprint)
-  // - userVerification: 'preferred'
-  // - NO residentKey (the reference project doesn't set it)
+  // Use server-provided authenticatorSelection with minimal additions.
+  // Do NOT override userVerification='preferred' — it causes 2 fingerprint
+  // prompts on Android (user verification + credential creation).
+  // Instead use 'discouraged' so only the platform authenticator itself
+  // prompts for biometric (during credential creation).
   publicKey.authenticatorSelection = {
+    ...optionsJSON.authenticatorSelection,
     authenticatorAttachment: 'platform',
-    userVerification: 'preferred',
+    userVerification: 'discouraged',
   };
   // Remove residentKey — it causes "credential manager" errors on some Android devices
   // when combined with authenticatorAttachment: 'platform'
