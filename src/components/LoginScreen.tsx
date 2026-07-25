@@ -669,12 +669,14 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         
         let attResp;
         try {
-          // nativeStartRegistration forces authenticatorAttachment:'platform' +
-          // userVerification:'preferred' (matching reference project) and adds
-          // hints:['client-device'] to get fingerprint prompt instead of NFC/USB.
-          attResp = await nativeStartRegistration(options);
-        } catch (e: any) {
-          throw new Error('Не удалось зарегистрировать Passkey. Убедитесь, что отпечаток пальца или FaceID настроены на вашем устройстве. (' + e.message + ')');
+          attResp = await nativeStartRegistration(options, true);
+        } catch (e1: any) {
+          console.warn('WebAuthn registration with platform attachment failed, retrying without...', e1);
+          try {
+            attResp = await nativeStartRegistration(options, false);
+          } catch (e2: any) {
+            throw new Error('Не удалось зарегистрировать Passkey. Убедитесь, что отпечаток пальца или FaceID настроены на вашем устройстве. (' + e2.message + ')');
+          }
         }
 
         // 3. Generate Crypto Keys

@@ -66,14 +66,17 @@ interface AuthenticationOptionsJSON {
 }
 
 /**
- * Register a new passkey using the native navigator.credentials.create() API.
- * This matches the reference project's approach exactly.
+ * Build PublicKeyCredentialCreationOptions from JSON and create a credential.
+ * @param forcePlatform - when true, forces authenticatorAttachment:'platform'
+ *   (fingerprint/FaceID). When false, uses server-provided authenticatorSelection.
+ *   Platform attachment is needed to avoid NFC/USB chooser, but causes
+ *   "credential manager" errors on some Android WebViews. The fallback in
+ *   SettingsModal calls with forcePlatform=false when the first attempt fails.
  */
-export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJSON): Promise<any> {
-  // Build the native options, matching the reference project's composeOptPkCreate:
-  // - rp without explicit id (let browser use current origin)
-  // - authenticatorSelection with userVerification and residentKey only
-  // - NO authenticatorAttachment
+export async function nativeStartRegistration(
+  optionsJSON: RegistrationOptionsJSON,
+  forcePlatform = true,
+): Promise<any> {
   const publicKey = {
     challenge: base64urlToBuffer(optionsJSON.challenge),
     rp: { name: optionsJSON.rp.name },
@@ -94,17 +97,29 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     hints: ['client-device'],
   } as any;
 
-  // Match the reference project EXACTLY (from the article):
-  // - authenticatorAttachment: 'platform' (force fingerprint/FaceID)
-  // - userVerification: 'preferred'
-  // - NO residentKey (the reference project doesn't set it)
-  publicKey.authenticatorSelection = {
-    authenticatorAttachment: 'platform',
-    userVerification: 'preferred',
-  };
-  // Remove residentKey — it causes "credential manager" errors on some Android devices
-  // when combined with authenticatorAttachment: 'platform'
-  delete publicKey.authenticatorSelection.residentKey;
+  if (forcePlatform) {
+    // Force platform authenticator (fingerprint/FaceID).
+    // authenticatorAttachment:'platform' is NEEDED — without it, the browser
+    // offers QR/NFC cross-device flow instead of biometric on Android.
+    // Remove residentKey — it causes "credential manager" errors on some
+    // Android devices when combined with authenticatorAttachment: 'platform'.
+    publicKey.authenticatorSelection = {
+      authenticatorAttachment: 'platform',
+      userVerification: 'preferred',
+    };
+  } else {
+    // Fallback: use server-provided authenticatorSelection AS-IS.
+    // No authenticatorAttachment — avoids "credential manager" errors
+    // on Android WebViews (Telegram, PWA) that don't support platform
+    // authenticator attachment. hints:['client-device'] still guides
+    // the browser toward fingerprint/FaceID.
+    publicKey.authenticatorSelection = {
+      ...optionsJSON.authenticatorSelection,
+    };
+    // Remove residentKey from server options too — it can cause
+    // "credential manager" errors when combined with hints.
+    delete publicKey.authenticatorSelection.residentKey;
+  }
 
   // Add excludeCredentials if present
   if (optionsJSON.excludeCredentials?.length) {

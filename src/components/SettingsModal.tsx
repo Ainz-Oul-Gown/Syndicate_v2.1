@@ -373,7 +373,16 @@ hapticImpact("selection");
           // nativeStartRegistration forces authenticatorAttachment:'platform' +
           // userVerification:'preferred' (matching reference project) and adds
           // hints:['client-device'] to get fingerprint prompt instead of NFC/USB.
-          const attResp = await nativeStartRegistration(options);
+          // If platform attachment fails (credential manager errors on Android WebView),
+          // fallback retries without it — hints:['client-device'] still guides
+          // the browser toward fingerprint.
+          let attResp;
+          try {
+            attResp = await nativeStartRegistration(options, true);
+          } catch (e1: any) {
+            console.warn('WebAuthn registration with platform attachment failed, retrying without...', e1);
+            attResp = await nativeStartRegistration(options, false);
+          }
 
           const { data: verifyData, error: verifyErr } = await supabaseClient.functions.invoke('webauthn-verify-registration', {
           body: { 
