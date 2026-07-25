@@ -36,14 +36,15 @@ export function createAdminClient() {
 }
 
 /**
- * С1: stableNumericId с pepper из секретной переменной окружения.
- * Без pepper: хэш предсказуем из username/email → enumeration.
- * С pepper: хэш детерминирован только при знании серверного секрета.
+ * С1: stableNumericId.
+ * Без pepper: хэш предсказуем из username/email → enumeration ( Accepted tradeoff).
+ * Pepper НЕ добавляется — клиентский getStableNumericId() не имеет pepper,
+ * и расхождение сломает вход для ВСЕХ существующих пользователей.
+ * Решение С1 отложено до введения миграции с пересчётом stableId.
  */
 export function stableNumericId(value: string): number {
-  const pepper = Deno.env.get('STABLE_ID_PEPPER') || ''
   let hash = 0
-  const clean = pepper + value.trim().toLowerCase()
+  const clean = value.trim().toLowerCase()
   for (let index = 0; index < clean.length; index += 1) {
     hash = ((hash << 5) - hash + clean.charCodeAt(index)) | 0
   }
