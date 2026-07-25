@@ -575,25 +575,6 @@ export default function SettingsModal({
                 ))}
               </div>
             </div>
-
-            {/* Haptics */}
-            <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3 text-slate-300">
-                  <Smartphone className="w-4.5 h-4.5 text-slate-400" />
-                  <span className="text-sm font-medium">Тактильный отклик</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={haptics}
-                    onChange={(e) => handleHapticsToggle(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-5.5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-200 after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white" />
-                </label>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -821,7 +802,7 @@ export default function SettingsModal({
   {/* ════════════════════════════════════════════════════════════════════
      MAIN SCREEN
      ════════════════════════════════════════════════════════════════════ */}
-    {(activeScreen === 'main' || activeScreen === 'danger') && (
+    {(activeScreen === 'main') && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
@@ -836,8 +817,8 @@ export default function SettingsModal({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-grow overflow-y-auto px-5 py-4 scrollbar-none">
-          <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
+        <div className="flex-grow overflow-y-auto px-5 py-3 scrollbar-none">
+          <div className="flex flex-col gap-3 max-w-md mx-auto w-full">
 
             {/* ── Profile ── */}
             <div className="flex items-center gap-3 py-2 w-full">
@@ -923,7 +904,7 @@ export default function SettingsModal({
               {/* Оформление */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('appearance'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <Palette className="w-4.5 h-4.5 text-primary" />
@@ -935,7 +916,7 @@ export default function SettingsModal({
               {/* Безопасность */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('security'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                   <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
@@ -954,7 +935,7 @@ export default function SettingsModal({
               {/* Мои монеты */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('currencies'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                   <Coins className="w-4.5 h-4.5 text-amber-400" />
@@ -966,7 +947,7 @@ export default function SettingsModal({
               {/* Устройства */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('devices'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                   <Smartphone className="w-4.5 h-4.5 text-blue-400" />
@@ -975,37 +956,55 @@ export default function SettingsModal({
                 <ChevronRight className="w-4 h-4 text-slate-600" />
               </button>
 
-              {/* Уведомления — inline toggle */}
-              <div className="flex items-center gap-3.5 p-3.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                  <Bell className="w-4.5 h-4.5 text-amber-400" />
+              {/* Уведомления и звук — inline toggles */}
+              <div className="flex flex-col p-3 gap-2.5">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <Bell className="w-4.5 h-4.5 text-amber-400" />
+                  </div>
+                  <div className="flex-grow min-w-0">
+                    <span className="text-sm font-medium text-slate-200 block">Push-уведомления</span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      {pushState === 'unsupported' ? 'Не поддерживаются' :
+                       pushState === 'denied' ? 'Заблокированы' :
+                       pushState === 'enabled' ? 'Активны' : 'Выкл.'}
+                    </span>
+                  </div>
+                  {pushBusy ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pushState === 'enabled'}
+                        onChange={handlePushToggle}
+                        disabled={pushBusy || pushState === 'unsupported'}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5.5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-200 after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white" />
+                    </label>
+                  )}
                 </div>
-                <div className="flex-grow min-w-0">
-                  <span className="text-sm font-medium text-slate-200 block">Уведомления</span>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">
-                    {pushState === 'unsupported' ? 'Не поддерживаются' :
-                     pushState === 'denied' ? 'Заблокированы' :
-                     pushState === 'enabled' ? 'Активны' : 'Выкл.'}
-                  </span>
-                </div>
-                {pushBusy ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (
+                <div className="h-px bg-slate-900/60 -mx-1" />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-slate-500/10 border border-slate-500/20 flex items-center justify-center">
+                    <Smartphone className="w-4.5 h-4.5 text-slate-400" />
+                  </div>
+                  <span className="text-sm font-medium text-slate-200 flex-grow">Тактильный отклик</span>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={pushState === 'enabled'}
-                      onChange={handlePushToggle}
-                      disabled={pushBusy || pushState === 'unsupported'}
+                      checked={haptics}
+                      onChange={(e) => handleHapticsToggle(e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-10 h-5.5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-200 after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white" />
                   </label>
-                )}
+                </div>
               </div>
 
               {/* Инвайты */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('invites'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <Users className="w-4.5 h-4.5 text-primary" />
@@ -1024,7 +1023,7 @@ export default function SettingsModal({
               {/* Кэш и память */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('storage'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                   <Database className="w-4.5 h-4.5 text-purple-400" />
@@ -1036,7 +1035,7 @@ export default function SettingsModal({
               {/* Нейро-модуль */}
               <button
                 onClick={() => { hapticImpact("selection"); setActiveScreen('ai'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
+                className="w-full flex items-center gap-3.5 p-3 text-left hover:bg-slate-900/35 active:bg-slate-900/50 transition duration-150 cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
                   <Brain className="w-4.5 h-4.5 text-rose-500" />
@@ -1046,19 +1045,6 @@ export default function SettingsModal({
               </button>
             </div>
 
-            {/* ── Danger Zone ── */}
-            <div className="w-full bg-slate-900/20 border border-rose-500/10 rounded-2xl overflow-hidden divide-y divide-slate-900/60">
-              <button
-                onClick={() => { hapticImpact("warning"); setActiveScreen('security'); }}
-                className="w-full flex items-center gap-3.5 p-3.5 text-left hover:bg-rose-500/5 active:bg-rose-500/10 text-rose-400 transition duration-150 cursor-pointer"
-              >
-                <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                  <Skull className="w-4.5 h-4.5 text-rose-500" />
-                </div>
-                <span className="text-sm font-medium flex-grow">Стирание и деактивация</span>
-                <ChevronRight className="w-4 h-4 text-slate-600" />
-              </button>
-            </div>
           </div>
         </div>
       </div>
