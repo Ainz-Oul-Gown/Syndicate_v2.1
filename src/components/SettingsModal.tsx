@@ -24,12 +24,15 @@ import {
   Clock,
   Bell,
   Loader2,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import CurrenciesScreen from './CurrenciesScreen';
 import DevicesScreen from './DevicesScreen';
 import StorageScreen from './StorageScreen';
 import AiScreen from './AiScreen';
-import { applyTheme } from '../lib/theme';
+import { applyTheme, applyThemeMode, THEME_COLORS, type ThemeMode } from '../lib/theme';
 import { supabaseClient } from '../lib/supabase';
 import * as idbKeyval from 'idb-keyval';
 import { disablePushNotifications, enablePushNotifications, getPushState, type PushState } from '../lib/pushNotifications';
@@ -102,7 +105,11 @@ interface SettingsModalProps {
   onUpdateName?: (newName: string) => void;
 }
 
-const THEME_COLORS = ['#0A84FF', '#FF2D55', '#32D74B', '#BF5AF2'];
+const THEME_MODE_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { value: 'auto', label: 'Системная', icon: Monitor },
+  { value: 'dark', label: 'Тёмная', icon: Moon },
+  { value: 'light', label: 'Светлая', icon: Sun },
+];
 
 export default function SettingsModal({
   userId,
@@ -116,6 +123,7 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const [activeScreen, setActiveScreen] = useState<'main' | 'currencies' | 'devices' | 'storage' | 'ai'>('main');
   const [accentColor, setAccentColor] = useState('#0A84FF');
+  const [themeMode, setThemeMode] = useState<ThemeMode>('auto');
   const [haptics, setHaptics] = useState(true);
   const [hasPin, setHasPin] = useState(false);
   const [hasPanicPin, setHasPanicPin] = useState(false);
@@ -181,6 +189,10 @@ export default function SettingsModal({
     // Read theme color
     const savedColor = localStorage.getItem('synd_theme_color') || '#0A84FF';
     setAccentColor(savedColor);
+
+    // Read theme mode
+    const savedMode = (localStorage.getItem('synd_theme_mode') as ThemeMode) || 'auto';
+    setThemeMode(savedMode);
 
     // Read haptics
     setHaptics(localStorage.getItem('synd_haptics') !== 'off');
@@ -323,8 +335,14 @@ export default function SettingsModal({
     setAccentColor(color);
     localStorage.setItem('synd_theme_color', color);
     applyTheme(color);
+    hapticImpact("selection");
+  };
 
-hapticImpact("selection");
+  const handleThemeModeSelect = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    localStorage.setItem('synd_theme_mode', mode);
+    applyThemeMode(mode);
+    hapticImpact("selection");
   };
 
   const handleHapticsToggle = (checked: boolean) => {
@@ -624,22 +642,66 @@ hapticImpact("selection");
           </h3>
 
           <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl overflow-hidden divide-y divide-slate-900">
-            {/* Color picker */}
-            <div className="flex items-center justify-between p-4 bg-slate-900/10">
-              <div className="flex items-center gap-3 text-slate-300">
-                <Palette className="w-4.5 h-4.5 text-primary" />
-                <span className="text-sm font-medium">Цвет интерфейса</span>
+            {/* Theme mode selector */}
+            <div className="p-4 bg-slate-900/10">
+              <div className="flex items-center gap-3 text-slate-300 mb-3">
+                <Monitor className="w-4.5 h-4.5 text-primary" />
+                <span className="text-sm font-medium">Тема оформления</span>
               </div>
-              <div className="flex gap-3">
-                {THEME_COLORS.map((color) => (
+              <div className="flex gap-2">
+                {THEME_MODE_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const isActive = themeMode === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleThemeModeSelect(opt.value)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                        isActive
+                          ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                          : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 px-0.5">
+                {themeMode === 'auto' ? 'Следует настройкам устройства (тёмная/светлая)' :
+                 themeMode === 'dark' ? 'Тёмная тема всегда' : 'Светлая тема всегда'}
+              </p>
+            </div>
+
+            {/* Color picker */}
+            <div className="p-4 bg-slate-900/10">
+              <div className="flex items-center gap-3 text-slate-300 mb-3">
+                <Palette className="w-4.5 h-4.5 text-primary" />
+                <span className="text-sm font-medium">Акцентный цвет</span>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                {THEME_COLORS.map((c) => (
                   <button
-                    key={color}
-                    onClick={() => handleColorSelect(color)}
-                    style={{ backgroundColor: color }}
-                    className={`w-6 h-6 rounded-full border-2 transition duration-200 active:scale-90 cursor-pointer ${
-                      accentColor === color ? 'border-white scale-110 shadow-lg' : 'border-transparent'
-                    }`}
-                  />
+                    key={c.hex}
+                    onClick={() => handleColorSelect(c.hex)}
+                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
+                    title={c.name}
+                  >
+                    <div
+                      style={{ backgroundColor: c.hex }}
+                      className={`w-8 h-8 rounded-full border-2 transition-all duration-200 active:scale-90 group-hover:scale-110 ${
+                        accentColor === c.hex
+                          ? 'border-white scale-110 shadow-lg ring-2 ring-white/20'
+                          : 'border-transparent'
+                      }`}
+                    />
+                    <span className={`text-[9px] font-mono tracking-wide transition-colors ${
+                      accentColor === c.hex ? 'text-primary font-bold' : 'text-slate-500'
+                    }`}>
+                      {c.name}
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>

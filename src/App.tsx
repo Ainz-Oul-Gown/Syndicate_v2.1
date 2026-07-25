@@ -38,7 +38,7 @@ import StealthOverlay from './components/StealthOverlay';
 import PinScreen from './components/PinScreen';
 import ChatView from './components/ChatView';
 import SettingsModal from './components/SettingsModal';
-import { applyTheme } from './lib/theme';
+import { loadThemeSettings } from './lib/theme';
 import { hapticImpact } from './lib/haptics';
 import { auth } from './lib/firebase';
 import { DRAFT_CHANGED_EVENT, readDraftPreviews, type DraftChangedDetail } from './lib/drafts';
@@ -1398,9 +1398,18 @@ export default function App() {
         retryBootstrapRef.current = bootstrap;
         bootstrap();
 
-        // Load custom themes on boot
-        const themeColor = localStorage.getItem('synd_theme_color') || '#0A84FF';
-        applyTheme(themeColor);
+        // Load custom themes on boot (accent color + dark/light/auto mode)
+        loadThemeSettings();
+
+        // Listen for system color scheme changes when in auto mode
+        const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleSystemThemeChange = () => {
+            const savedMode = localStorage.getItem('synd_theme_mode') || 'auto';
+            if (savedMode === 'auto') {
+                loadThemeSettings();
+            }
+        };
+        mqDark.addEventListener('change', handleSystemThemeChange);
 
         const checkStandalone = () => {
             const isStA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
@@ -1438,6 +1447,7 @@ export default function App() {
             });
             appChannelsRef.current = [];
             mq.removeEventListener('change', checkStandalone);
+            mqDark.removeEventListener('change', handleSystemThemeChange);
             document.removeEventListener('visibilitychange', handleBackgroundAutoLock);
             window.removeEventListener('online', handleStartupOnline);
         };
