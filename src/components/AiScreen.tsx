@@ -1,6 +1,6 @@
 import { hapticImpact } from "../lib/haptics";
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Brain, Cpu, ShieldAlert, Sparkles, Download, Trash, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Brain, Cpu, ShieldAlert, Sparkles, Download, Trash, RefreshCw } from 'lucide-react';
 
 interface AiScreenProps {
     onBack: () => void;
@@ -170,19 +170,20 @@ export default function AiScreen({ onBack, worker }: AiScreenProps) {
     return (
         <div className="flex flex-col min-h-full bg-slate-950 text-slate-100 select-none animate-fade-in font-sans">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-900 pb-4 mb-6 px-1">
+            <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
                 <button
                     onClick={onBack}
-                    className="text-primary hover:text-primary-hover font-semibold flex items-center gap-1 focus:outline-none transition active:scale-95"
+                    className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
                 >
-                    <ChevronLeft className="w-5 h-5" /> Назад
+                    <ArrowLeft className="w-5 h-5" />
                 </button>
-                <span className="font-bold font-display text-slate-200 tracking-tight text-base">Нейро-модуль</span>
+                <Brain className="w-5 h-5 text-primary" />
+                <span className="font-bold font-display text-slate-200 text-lg tracking-tight flex-grow">Нейро-модуль</span>
                 <button
                     onClick={calculateSizes}
-                    className="text-primary hover:text-primary-hover p-1 transition active:scale-95"
+                    className="p-2 rounded-xl bg-slate-900/40 border border-slate-900 text-slate-400 hover:text-primary transition active:scale-95 cursor-pointer"
                 >
-                    <RefreshCw className="w-4.5 h-4.5" />
+                    <RefreshCw className="w-4 h-4" />
                 </button>
             </div>
 

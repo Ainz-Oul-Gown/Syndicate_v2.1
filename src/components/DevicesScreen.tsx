@@ -6,7 +6,7 @@ import { readRefreshToken } from '../lib/sessionStorage';
 import { arrayBufferToBase64 } from '../lib/crypto';
 import { UserDevice } from '../types';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { ChevronLeft, Trash2, ShieldAlert, Key, Crown, Laptop, Smartphone, Info } from 'lucide-react';
+import { ArrowLeft, Trash2, ShieldAlert, Key, Crown, Laptop, Smartphone, Info } from 'lucide-react';
 
 interface DevicesScreenProps {
   userId: number;
@@ -178,27 +178,25 @@ hapticImpact("success");
   return (
     <div className="flex flex-col h-full bg-slate-950 text-slate-100 select-none animate-fade-in font-sans max-w-lg mx-auto w-full px-2">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-900 pb-4 mb-5 px-1 flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
         <button
           onClick={onBack}
-          className="text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-900 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+          className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
         >
-          <ChevronLeft className="w-4 h-4" /> Назад
+          <ArrowLeft className="w-5 h-5" />
         </button>
-        <span className="font-extrabold font-mono tracking-wider text-slate-300 text-xs uppercase">
-          Активные сессии
-        </span>
+        <Smartphone className="w-5 h-5 text-primary" />
+        <span className="font-bold font-display text-slate-200 text-lg tracking-tight flex-grow">Устройства</span>
         <button
           onClick={() => { hapticImpact("selection"); setShowRuleInfo(!showRuleInfo); }}
-          className={`p-1.5 rounded-lg border transition active:scale-95 cursor-pointer flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
+          className={`p-2 rounded-xl border transition active:scale-95 cursor-pointer flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider ${
             showRuleInfo
               ? 'bg-primary/10 border-primary/25 text-primary'
               : 'bg-slate-900/40 border-slate-900 text-slate-400 hover:text-slate-200'
           }`}
           title="Показать справку"
         >
-          <Info className="w-3.5 h-3.5" />
-          <span>{showRuleInfo ? 'Скрыть' : 'Инфо'}</span>
+          <Info className="w-4 h-4" />
         </button>
       </div>
 

@@ -26,6 +26,7 @@ import {
   Moon,
   Monitor,
   Users,
+  Settings,
   AlertTriangle,
 } from 'lucide-react';
 import CurrenciesScreen from './CurrenciesScreen';
@@ -836,15 +837,15 @@ export default function SettingsModal({
   return (
     <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
       {/* Header */}
-      <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-slate-900 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
         <button
           onClick={onClose}
-          className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
+          className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
+        <Settings className="w-5 h-5 text-primary" />
         <span className="font-bold font-display text-slate-200 text-lg tracking-tight">Настройки</span>
-        <div className="w-10 h-10" />
       </div>
 
       {/* Scrollable Content */}
