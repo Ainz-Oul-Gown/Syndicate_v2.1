@@ -3,6 +3,8 @@ import { LoginScreen } from './components/LoginScreen';
 import type { StartupState } from './components/StartupScreen';
 import { useState, useEffect, useRef } from 'react';
 import * as idbKeyval from 'idb-keyval';
+import { AnimatePresence, motion } from 'motion/react';
+import AnimatedScreen from './components/AnimatedScreen';
 import {
     ShieldAlert,
     Smartphone,
@@ -1548,7 +1550,9 @@ export default function App() {
             )}
 
             {/* Screens routers */}
+            <AnimatePresence mode="wait">
             {activeScreen === 'chat' && activeChat ? (
+                <AnimatedScreen key="chat-screen" screenKey="chat">
                 <ChatView
                     chat={activeChat}
                     currentUser={currentUser!}
@@ -1559,7 +1563,9 @@ export default function App() {
                     }}
                     worker={workerRef.current}
                 />
+                </AnimatedScreen>
             ) : (
+                <AnimatedScreen key="main-screen" screenKey="main">
                 <div className="flex flex-col h-full overflow-hidden px-3 pt-2 pb-4 flex-grow relative max-w-3xl mx-auto w-full">
                     {/* Header */}
                     <div className="flex items-center justify-between py-2 mb-3 border-b border-slate-900 flex-shrink-0">
@@ -1938,12 +1944,29 @@ export default function App() {
                         })()}
                     </div>
                 </div>
+                </AnimatedScreen>
             )}
+            </AnimatePresence>
 
+            {/* Modals with animations */}
+            <AnimatePresence>
             {/* Install Prompt Modal */}
             {showInstallPrompt && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-4 sm:p-5 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto scrollbar-thin my-auto">
+                <motion.div
+                    key="install-modal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto"
+                >
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.92, y: 20 }}
+                        transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+                        className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-4 sm:p-5 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto scrollbar-thin my-auto"
+                    >
                         <div className="flex items-center justify-between">
                             <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                                 <Download className="w-5 h-5 text-primary" />
@@ -1979,8 +2002,8 @@ export default function App() {
                                 Скопировать ссылку на приложение
                             </button>
                         </div>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             )}
 
             {/* Settings Modal */}
@@ -2007,8 +2030,21 @@ export default function App() {
 
             {/* Create Group Modal */}
             {showCreateGroup && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex flex-col justify-center p-4 sm:p-6 animate-fade-in overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-2xl flex flex-col gap-4 max-w-md w-full mx-auto relative max-h-[90vh] overflow-y-auto scrollbar-thin my-auto">
+                <motion.div
+                    key="create-group-modal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex flex-col justify-center p-4 sm:p-6 overflow-y-auto"
+                >
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.92, y: 20 }}
+                        transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+                        className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-2xl flex flex-col gap-4 max-w-md w-full mx-auto relative max-h-[90vh] overflow-y-auto scrollbar-thin my-auto"
+                    >
                         <button
                             onClick={() => !isCreatingGroup && setShowCreateGroup(false)}
                             disabled={isCreatingGroup}
@@ -2033,14 +2069,27 @@ export default function App() {
                             {isCreatingGroup && <Loader2 className="w-5 h-5 animate-spin" />}
                             {isCreatingGroup ? 'Создаём…' : 'Создать'}
                         </button>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             )}
 
             {/* Add Friend Modal */}
             {showAddFriend && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950/85 backdrop-blur-md flex flex-col justify-center p-3 sm:p-5 animate-fade-in font-sans overflow-y-auto overflow-x-hidden">
-                    <div className="bg-gradient-to-br from-slate-900/95 to-slate-950/95 border border-slate-800/90 p-4 sm:p-6 rounded-3xl flex flex-col gap-4 sm:gap-5 max-w-md w-full mx-auto relative shadow-2xl max-h-[95vh] overflow-y-auto scrollbar-none my-auto">
+                <motion.div
+                    key="add-friend-modal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 z-[1000] bg-slate-950/85 backdrop-blur-md flex flex-col justify-center p-3 sm:p-5 font-sans overflow-y-auto overflow-x-hidden"
+                >
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.92, y: 20 }}
+                        transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+                        className="bg-gradient-to-br from-slate-900/95 to-slate-950/95 border border-slate-800/90 p-4 sm:p-6 rounded-3xl flex flex-col gap-4 sm:gap-5 max-w-md w-full mx-auto relative shadow-2xl max-h-[95vh] overflow-y-auto scrollbar-none my-auto"
+                    >
                         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
 
                         <button
@@ -2098,9 +2147,10 @@ export default function App() {
                             {searchSpinner && <Loader2 className="w-5 h-5 animate-spin" />}
                             {searchSpinner ? 'ОТПРАВЛЯЕМ…' : 'ОТПРАВИТЬ ЗАПРОС'}
                         </button>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             )}
+            </AnimatePresence>
         </div>
     );
 }
