@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
+import { issueRefreshToken } from '../_shared/provider-auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,10 +54,13 @@ serve(async (req) => {
 
     const now = Math.floor(Date.now() / 1000);
     const jwt = await new jose.SignJWT({ aud: 'authenticated', role: 'authenticated', iss: 'supabase', tg_id: stableId, auth_provider: 'seed', session_version: Number(dbUser.session_version || 1), sub: dbUser.id })
-      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).setIssuedAt(now).setExpirationTime(now + 60 * 60 * 24 * 7)
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).setIssuedAt(now).setExpirationTime(now + 30 * 60)  // 30 минут вместо 7 дней
       .sign(new TextEncoder().encode(JWT_SECRET));
 
-    return new Response(JSON.stringify({ token: jwt, user: dbUser }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // К2: Выдаём refresh-токен
+    const refreshToken = await issueRefreshToken(supabaseAdmin, dbUser.id, req.headers.get('user-agent'));
+
+    return new Response(JSON.stringify({ token: jwt, refreshToken, user: dbUser }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }

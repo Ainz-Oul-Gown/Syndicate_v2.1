@@ -1,4 +1,4 @@
-import { readSessionToken, writeSessionToken } from './lib/sessionStorage';
+import { readRefreshToken, writeRefreshToken } from './lib/sessionStorage';
 import { LoginScreen } from './components/LoginScreen';
 import type { StartupState } from './components/StartupScreen';
 import { useState, useEffect, useRef } from 'react';
@@ -31,7 +31,7 @@ import {
     Search,
     Pin,
 } from 'lucide-react';
-import { supabaseClient, setSupabaseToken, parseJwt, isSupabaseTokenUsable } from './lib/supabase';
+import { supabaseClient, setSupabaseToken, getSupabaseToken, parseJwt, isSupabaseTokenUsable } from './lib/supabase';
 import { checkCryptoKeys, generateChatKey, encryptChatKeyForFriend, decryptChatKey, getFingerprint } from './lib/crypto';
 import { Chat, Friendship, User, DeviceRequest } from './types';
 import StealthOverlay from './components/StealthOverlay';
@@ -63,6 +63,8 @@ type DraftPreview = {
 };
 
 export default function App() {
+    const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+    const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
     const [currentUser, setCurrentUser] = useState<{ id: number; first_name: string } | null>(null);
     const [telegramMiniAppContext, setTelegramMiniAppContext] = useState<TelegramMiniAppContext | null>(null);
     const [myFingerprint, setMyFingerprint] = useState<string | null>(null);
@@ -357,14 +359,9 @@ export default function App() {
 
     // 1. Authenticate user from Telegram WebApp context or custom saved JWT tokens
     const authUser = async (): Promise<{ id: number; first_name: string } | null> => {
-        const urlToken: string | null = null;
-        if (window.location.hash.includes('token=')) {
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-        }
         const tgInitData = window.Telegram?.WebApp?.initData;
 
         if (tgInitData) {
-            const oldToken = readSessionToken();
             try {
                 setLoadingText('Проверяем сессию…');
                 setSupabaseToken(null); // Telegram initData validates the request independently.
@@ -382,7 +379,8 @@ export default function App() {
                 }
 
                 if (result?.token && result?.user) {
-                    writeSessionToken(result.token);
+                    // К2: Сохраняем refresh-токен в localStorage, access — только в памяти
+                    if (result.refreshToken) writeRefreshToken(result.refreshToken);
                     setSupabaseToken(result.token);
                     setTelegramMiniAppContext(null);
                     const userObj = { id: result.user.tg_id, first_name: result.user.first_name };
@@ -392,16 +390,14 @@ export default function App() {
                 throw new Error('Telegram-аутентификация не вернула сессию');
             } catch (e) {
                 console.error('Telegram auth failed', e);
-                if (oldToken) setSupabaseToken(oldToken);
             }
         }
 
-        const candidateToken = urlToken && urlToken.startsWith('eyJ') ? urlToken : readSessionToken();
-        const tokenToUse = isSupabaseTokenUsable(candidateToken) ? candidateToken : null;
-        if (candidateToken && !tokenToUse) setSupabaseToken(null);
-        if (tokenToUse) {
-            setSupabaseToken(tokenToUse);
-            const payload = parseJwt(tokenToUse);
+        // К2: Access-токен теперь ТОЛЬКО в памяти (getSupabaseToken())
+        // Если токена нет — нужен полный re-login (refresh-токен используется для auto-refresh)
+        const currentAccessToken = getSupabaseToken();
+        if (currentAccessToken && isSupabaseTokenUsable(currentAccessToken)) {
+            const payload = parseJwt(currentAccessToken);
 
             if (payload && payload.tg_id) {
                 setLoadingText('Подключаемся…');
@@ -414,11 +410,36 @@ export default function App() {
                 if (data) {
                     const userObj = { id: payload.tg_id, first_name: data.first_name };
                     setCurrentUser(userObj);
-                    if (urlToken) {
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    }
                     return userObj;
                 }
+            }
+        }
+
+        // К2: Нет валидного access-токена — пытаемся refresh
+        const refreshToken = readRefreshToken();
+        if (refreshToken) {
+            setLoadingText('Обновляем сессию…');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/auth-refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_ANON_KEY,
+                        'X-Refresh-Token': refreshToken,
+                    },
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data?.token && data?.refreshToken && data?.user) {
+                        writeRefreshToken(data.refreshToken);
+                        setSupabaseToken(data.token);
+                        const userObj = { id: data.user.tg_id || data.user.id, first_name: data.user.first_name };
+                        setCurrentUser(userObj);
+                        return userObj;
+                    }
+                }
+            } catch {
+                // Refresh failed — нужно полное переавторизование
             }
         }
 
@@ -1237,7 +1258,7 @@ export default function App() {
 
         // 3. Отзываем все ранее выданные JWT этого аккаунта.
         try {
-            if (readSessionToken()) {
+            if (getSupabaseToken()) {
                 await supabaseClient.functions.invoke('auth-revoke-sessions', { body: {} });
             }
         } catch (e) {
@@ -1454,8 +1475,10 @@ export default function App() {
                 deferredPrompt={deferredPrompt}
                 setDeferredPrompt={setDeferredPrompt}
                 telegramMiniAppContext={telegramMiniAppContext}
-                onLoginSuccess={async (token, masterKeysJSON, user) => {
-                    writeSessionToken(token);
+                onLoginSuccess={async (token, masterKeysJSON, user, refreshToken) => {
+                    // К2: Access-токен — только в памяти; refresh-токен — в localStorage
+                    if (refreshToken) writeRefreshToken(refreshToken);
+                    setSupabaseToken(token);
 
                     if (masterKeysJSON) {
                         try {

@@ -2,27 +2,22 @@
  * Общий обработчик Telegram OTP-аутентификации.
  * Используется двумя Edge Functions: auth-telegram и auth-telegram-otp.
  * Устраняет дублирование кода (Н3 из аудита безопасности).
+ *
+ * К4: Добавлен rate-limiting (auth_attempts + check_rate_limit).
+ * К4: Удалён ALLOW_LEGACY_TELEGRAM_OTP fallback — используется только v2 HMAC path.
  */
 import {
   allocateStableId, bindIdentity, consumeRegistrationInvite,
   createAdminClient, findUserByCandidateIds, getIdentityUser, issueUserToken,
   normalizePublicKeysPayload, prepareUserForAuthentication, stableNumericId,
   unwrapProviderVaultSecret, wrapProviderVaultSecret,
+  checkRateLimit, recordAuthAttempt, constantTimeEqual,
 } from './provider-auth.ts'
 
 function normalizeUsername(value: unknown) {
   const username = typeof value === 'string' ? value.trim().toLowerCase().replace(/^@/, '') : ''
   if (!/^[a-z0-9_]{5,32}$/.test(username)) throw new Error('Некорректный Telegram Username')
   return username
-}
-
-function constantTimeEqual(left: string, right: string) {
-  if (left.length !== right.length) return false
-  let difference = 0
-  for (let index = 0; index < left.length; index += 1) {
-    difference |= left.charCodeAt(index) ^ right.charCodeAt(index)
-  }
-  return difference === 0
 }
 
 async function hmacHex(secret: string, message: string) {
@@ -40,17 +35,32 @@ export async function handleTelegramAuth(body: any) {
   if (!/^\d{6}$/.test(otp)) throw new Error('Код должен состоять из 6 цифр')
 
   const supabaseAdmin = createAdminClient()
+
+  // К4: Rate-limiting — не более 5 попыток на username за 10 минут
+  const rateLimitOk = await checkRateLimit(supabaseAdmin, `tg_otp:${username}`, 'otp', 5, 10)
+  if (!rateLimitOk) {
+    // Записываем попытку как неуспешную для логирования
+    await recordAuthAttempt(supabaseAdmin, `tg_otp:${username}`, 'otp', false)
+    throw new Error('Слишком много попыток. Попробуйте через 10 минут')
+  }
+
   const challengeId = `tg_otp_${username}`
   const { data: challengeRow, error: readError } = await supabaseAdmin
     .from('auth_challenges').select('challenge').eq('id', challengeId).maybeSingle()
   if (readError) throw readError
-  if (!challengeRow?.challenge) throw new Error('Код подтверждения не найден или уже использован')
+  if (!challengeRow?.challenge) {
+    await recordAuthAttempt(supabaseAdmin, `tg_otp:${username}`, 'otp', false)
+    throw new Error('Код подтверждения не найден или уже использован')
+  }
 
   const { data: consumed, error: consumeError } = await supabaseAdmin
     .from('auth_challenges').delete().eq('id', challengeId).eq('challenge', challengeRow.challenge)
     .select('challenge').maybeSingle()
   if (consumeError) throw consumeError
-  if (!consumed) throw new Error('Код подтверждения уже использован')
+  if (!consumed) {
+    await recordAuthAttempt(supabaseAdmin, `tg_otp:${username}`, 'otp', false)
+    throw new Error('Код подтверждения уже использован')
+  }
 
   let telegramUserId = ''
   let valid = false
@@ -71,15 +81,15 @@ export async function handleTelegramAuth(body: any) {
     valid = constantTimeEqual(digest, String(parsed.otpDigest || ''))
   } catch (error: any) {
     if (error?.message === 'Срок действия кода истёк') throw error
-    if (Deno.env.get('ALLOW_LEGACY_TELEGRAM_OTP') === 'true') {
-      const [legacyOtp, timestampRaw] = String(challengeRow.challenge).split(':')
-      const timestamp = Number(timestampRaw)
-      telegramUserId = `legacy:${username}`
-      valid = legacyOtp === otp && Number.isFinite(timestamp) && Date.now() - timestamp <= 10 * 60 * 1000
-    } else {
-      throw new Error('Бот использует устаревший формат OTP. Обновите telegram-bot.js')
-    }
+    // К4: Legacy fallback УДАЛЁН. Только v2 HMAC path.
+    // Ранее: ALLOW_LEGACY_TELEGRAM_OTP === 'true' → legacyOtp === otp (без HMAC, без constant-time)
+    // Теперь: если v2 парсинг не удался — это ошибка формата бота
+    throw new Error('Бот использует устаревший формат OTP. Обновите telegram-bot.js')
   }
+
+  // К4: Записываем результат попытки
+  await recordAuthAttempt(supabaseAdmin, `tg_otp:${username}`, 'otp', valid)
+
   if (!valid) throw new Error('Неверный одноразовый код')
 
   const subject = telegramUserId

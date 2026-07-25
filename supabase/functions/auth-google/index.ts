@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
   allocateStableId, bindIdentity, consumeRegistrationInvite, corsHeaders,
   createAdminClient, findUserByCandidateIds, getIdentityUser, issueUserToken,
-  json, normalizePublicKeysPayload, prepareUserForAuthentication, stableNumericId,
+  issueRefreshToken, json, normalizePublicKeysPayload, prepareUserForAuthentication, stableNumericId,
   unwrapProviderVaultSecret, wrapProviderVaultSecret,
 } from '../_shared/provider-auth.ts'
 
@@ -82,8 +82,10 @@ serve(async (req) => {
       ? await unwrapProviderVaultSecret(identity.wrapped_vault_secret)
       : null
     const token = await issueUserToken(user, 'google')
+    // К2: Выдаём refresh-токен (30-мин access + 7-дневный refresh)
+    const refreshToken = await issueRefreshToken(supabaseAdmin, user.id, req.headers.get('user-agent'))
     return json({
-      token, stableId: user.tg_id, user,
+      token, refreshToken, stableId: user.tg_id, user,
       provider: { email: identity?.provider_email || email, vaultSecret, needsVaultMigration: !vaultSecret },
     })
   } catch (error: any) {

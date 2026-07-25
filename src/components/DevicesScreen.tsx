@@ -1,8 +1,8 @@
 import { hapticImpact } from "../lib/haptics";
 import { useState, useEffect } from 'react';
 import * as idbKeyval from 'idb-keyval';
-import { supabaseClient } from '../lib/supabase';
-import { readSessionToken } from '../lib/sessionStorage';
+import { supabaseClient, getSupabaseToken } from '../lib/supabase';
+import { readRefreshToken } from '../lib/sessionStorage';
 import { arrayBufferToBase64 } from '../lib/crypto';
 import { UserDevice } from '../types';
 import { Scanner } from '@yudiel/react-qr-scanner';
@@ -26,8 +26,9 @@ export default function DevicesScreen({ userId, onBack }: DevicesScreenProps) {
       if (parsed.sessionId && parsed.publicKey) {
         setIsScanning(false);
         setLoading(true);
-        // encrypt current token and master keys
-        const token = readSessionToken();
+        // К2: Access-токен теперь ТОЛЬКО в памяти
+        const token = getSupabaseToken();
+        const refreshToken = readRefreshToken();
         const myPrivRsa = await idbKeyval.get(`my_private_key_${userId}`);
         const myPrivEcdsa = await idbKeyval.get(`my_sign_key_${userId}`);
         
@@ -42,6 +43,7 @@ export default function DevicesScreen({ userId, onBack }: DevicesScreenProps) {
         
         const payloadObj = {
           token,
+          refreshToken,  // К2: Передаём refresh-токен на новое устройство
           masterKeys: masterKeysJSON,
           user: userData
         };

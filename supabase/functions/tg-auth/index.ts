@@ -8,6 +8,7 @@ import {
   findUserByCandidateIds,
   getIdentityUser,
   issueUserToken,
+  issueRefreshToken,
   json,
   normalizePublicKeysPayload,
   prepareUserForAuthentication,
@@ -207,8 +208,12 @@ serve(async (req) => {
       : null
     const token = await issueUserToken(user, 'telegram')
 
+    // К2: Выдаём refresh-токен (30-мин access + 7-дневный refresh)
+    const refreshToken = await issueRefreshToken(supabaseAdmin, user.id, req.headers.get('user-agent'))
+
     return json({
       token,
+      refreshToken,
       stableId: user.tg_id,
       id: user.tg_id,
       first_name: user.first_name,

@@ -46,7 +46,7 @@ interface TelegramMiniAppContext {
 }
 
 interface LoginScreenProps {
-  onLoginSuccess: (token: string, masterKeysJSON: string | null, userData: any) => void;
+  onLoginSuccess: (token: string, masterKeysJSON: string | null, userData: any, refreshToken?: string) => void;
   isError: boolean;
   loadingText: string;
   deferredPrompt: any;
@@ -185,8 +185,8 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
                 aesKey,
                 base64ToArrayBuffer(cipher)
               );
-              const { token, masterKeys, user } = JSON.parse(new TextDecoder().decode(decryptedPayloadBuf));
-              if (!disposed) onLoginSuccess(token, masterKeys, user);
+              const { token, masterKeys, user, refreshToken } = JSON.parse(new TextDecoder().decode(decryptedPayloadBuf));
+              if (!disposed) onLoginSuccess(token, masterKeys, user, refreshToken);
             } catch (error) {
               console.error('Failed to decrypt auth payload', error);
             }
@@ -303,7 +303,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
     const res = { json: async () => resData };
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    return data.token;
+    return { token: data.token, refreshToken: data.refreshToken };
   };
 
   const googleAuthCall = async (idToken: string, isRegister: boolean, name?: string, publicKeysPayload?: any, registrationInvite?: string, providerVaultSecret?: string) => {
@@ -371,7 +371,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
     return data;
   };
 
-  const seedChallengeAuth = async (stableId: number, signingKey: CryptoKey): Promise<string> => {
+  const seedChallengeAuth = async (stableId: number, signingKey: CryptoKey): Promise<{ token: string; refreshToken?: string }> => {
     const { data: challengeData, error: challengeError } = await supabaseClient.functions.invoke('auth-seed-challenge', {
       body: { stableId }
     });
@@ -394,7 +394,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
     if (!verifyData?.token || verifyData?.error) {
       throw new Error(verifyData?.error || 'Сервер отклонил криптографическое доказательство');
     }
-    return verifyData.token;
+    return { token: verifyData.token, refreshToken: verifyData.refreshToken };
   };
 
   const handleGenerateSeed = () => {
@@ -474,7 +474,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
       };
 
       // 4. Save to Database
-      const token = await customAuthCall(numericId, regName.trim(), publicKeysPayload, true, inviteCode);
+      const { token: authToken, refreshToken } = await customAuthCall(numericId, regName.trim(), publicKeysPayload, true, inviteCode);
 
       // 5. Store private keys locally in IndexedDB
       await idbKeyval.set(`my_private_key_${numericId}`, rsaKeyPair.privateKey);
@@ -487,7 +487,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
       localStorage.setItem('synd_alt_user', JSON.stringify({ id: numericId, first_name: regName.trim(), method: 'seed' }));
 
       hapticImpact("success");
-      onLoginSuccess(token, null, { id: numericId, first_name: regName.trim() });
+      onLoginSuccess(authToken, null, { id: numericId, first_name: regName.trim() }, refreshToken);
     } catch (err: any) {
       console.error(err);
       hapticImpact("error");
@@ -588,9 +588,9 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
       // Save alt profile session
       localStorage.setItem('synd_alt_user', JSON.stringify({ id: numericId, first_name: userProfile.first_name, method: 'seed' }));
 
-      const token = await seedChallengeAuth(numericId, impEcdsa);
+      const { token: authToken, refreshToken } = await seedChallengeAuth(numericId, impEcdsa);
       hapticImpact("success");
-      onLoginSuccess(token, null, { id: numericId, first_name: userProfile.first_name });
+      onLoginSuccess(authToken, null, { id: numericId, first_name: userProfile.first_name }, refreshToken);
     } catch (err: any) {
       console.error(err);
       hapticImpact("error");
@@ -751,7 +751,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         setWebauthnState('success');
         hapticImpact("success");
         setTimeout(() => {
-          onLoginSuccess(verification.token, null, { id: stableId, first_name: webauthnName.trim() });
+          onLoginSuccess(verification.token, null, { id: stableId, first_name: webauthnName.trim() }, verification.refreshToken);
         }, 1000);
 
       } catch (err: any) {
@@ -853,7 +853,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         setWebauthnState('success');
         hapticImpact("success");
         setTimeout(() => {
-          onLoginSuccess(verification.token, null, { id: stableId, first_name: userProfile.first_name });
+          onLoginSuccess(verification.token, null, { id: stableId, first_name: userProfile.first_name }, verification.refreshToken);
         }, 1000);
 
       } catch (err: any) {
@@ -961,7 +961,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
 
       localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: userProfile.first_name, method: 'telegram' }));
       hapticImpact("success");
-      onLoginSuccess(authResult.token, null, { id: stableId, first_name: userProfile.first_name });
+      onLoginSuccess(authResult.token, null, { id: stableId, first_name: userProfile.first_name }, authResult.refreshToken);
     } catch (err: any) {
       setErrorMessage(`Ошибка OTP: ${err.message}`);
       hapticImpact("error");
@@ -1030,7 +1030,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         method: 'telegram-miniapp',
       }));
       hapticImpact('success');
-      onLoginSuccess(authResult.token, null, { id: stableId, first_name: authResult.user.first_name });
+      onLoginSuccess(authResult.token, null, { id: stableId, first_name: authResult.user.first_name }, authResult.refreshToken);
     } catch (err: any) {
       setErrorMessage(`Ошибка регистрации Telegram Mini App: ${err.message}`);
       hapticImpact('error');
@@ -1218,7 +1218,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
           vault: encryptedVaultJson
         };
 
-        const token = await customAuthCall(stableId, emailName.trim(), publicKeysPayload, true, emailInvite);
+        const { token: authToken, refreshToken } = await customAuthCall(stableId, emailName.trim(), publicKeysPayload, true, emailInvite);
         await idbKeyval.set(`my_private_key_${stableId}`, rsaKeyPair.privateKey);
         await idbKeyval.set(`my_sign_key_${stableId}`, ecdsaKeyPair.privateKey);
 
@@ -1227,7 +1227,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: emailName.trim(), method: 'email' }));
 
         hapticImpact("success");
-        onLoginSuccess(token, null, { id: stableId, first_name: emailName.trim() });
+        onLoginSuccess(authToken, null, { id: stableId, first_name: emailName.trim() }, refreshToken);
 
       } else {
         // Login
@@ -1277,8 +1277,8 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: userProfile.first_name, method: 'email' }));
 
         hapticImpact("success");
-        const token = await seedChallengeAuth(stableId, impEcdsa);
-        onLoginSuccess(token, null, { id: stableId, first_name: userProfile.first_name });
+        const { token: authToken, refreshToken } = await seedChallengeAuth(stableId, impEcdsa);
+        onLoginSuccess(authToken, null, { id: stableId, first_name: userProfile.first_name }, refreshToken);
       }
 
     } catch (err: any) {
@@ -1358,7 +1358,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         localStorage.setItem('synd_my_pubsign_cache', JSON.stringify(keysPayload.legacy?.ecdsa || {}));
         localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: userProfile.first_name, method: 'google' }));
         hapticImpact("success");
-        onLoginSuccess(authResult.token, null, { id: stableId, first_name: userProfile.first_name });
+        onLoginSuccess(authResult.token, null, { id: stableId, first_name: userProfile.first_name }, authResult.refreshToken);
       } else {
         const rsaKeyPair = await window.crypto.subtle.generateKey(
           { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
@@ -1403,7 +1403,7 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
         localStorage.setItem('synd_my_pubsign_cache', JSON.stringify(ecdsaPubJwk));
         localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: authResult.user.first_name, method: 'google' }));
         hapticImpact("success");
-        onLoginSuccess(authResult.token, null, { id: stableId, first_name: authResult.user.first_name });
+        onLoginSuccess(authResult.token, null, { id: stableId, first_name: authResult.user.first_name }, authResult.refreshToken);
       }
     } catch (err: any) {
       hapticImpact("error");

@@ -3,7 +3,7 @@ import { verifyRegistrationResponse } from 'npm:@simplewebauthn/server'
 import { encodeBase64Url } from 'https://deno.land/std@0.224.0/encoding/base64url.ts'
 import {
   consumeRegistrationInvite, corsHeaders, createAdminClient, issueUserToken,
-  json, normalizePublicKeysPayload, verifySyndicateToken,
+  issueRefreshToken, json, normalizePublicKeysPayload, verifySyndicateToken,
 } from '../_shared/provider-auth.ts'
 
 function readBearer(req: Request) {
@@ -116,7 +116,9 @@ serve(async (req) => {
     }
 
     const token = await issueUserToken(finalUser, 'passkey')
-    return json({ verified: true, token, user: finalUser })
+    // К2: Выдаём refresh-токен
+    const refreshToken = await issueRefreshToken(admin, finalUser.id, req.headers.get('user-agent'))
+    return json({ verified: true, token, refreshToken, user: finalUser })
   } catch (error: any) {
     return json({ error: error?.message || 'Не удалось зарегистрировать Passkey' }, 400)
   }

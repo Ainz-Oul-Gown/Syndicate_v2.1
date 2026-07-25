@@ -65,6 +65,9 @@ export async function consumeRegistrationInvite(supabaseAdmin: any, rawCode: unk
   if (!data) throw new Error('Неверный или уже использованный код приглашения')
 }
 
+// К2: Access-токен живёт 30 минут (вместо 7 дней) — окно атаки при XSS сокращено в 336 раз
+const ACCESS_TOKEN_TTL_SECONDS = 30 * 60 // 30 минут
+
 export async function issueUserToken(user: any, provider: string) {
   const state = user?.account_state || (user?.status === 'blocked' ? 'blocked' : 'active')
   if (state !== 'active' || user?.status === 'blocked') throw new Error('Аккаунт недоступен для входа')
@@ -77,8 +80,50 @@ export async function issueUserToken(user: any, provider: string) {
   })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt(now)
-    .setExpirationTime(now + 60 * 60 * 24 * 7)
+    .setExpirationTime(now + ACCESS_TOKEN_TTL_SECONDS)
     .sign(new TextEncoder().encode(jwtSecret))
+}
+
+/**
+ * К2: Выдаёт refresh-токен (криптографически стойкий случайный токен).
+ * Хранится в БД как SHA-256 хэш. Возвращается в открытом виде клиенту.
+ * @returns refresh-токен (hex-строка, 96 символов)
+ */
+export async function issueRefreshToken(
+  supabaseAdmin: any,
+  userId: string,
+  userAgent?: string | null,
+): Promise<string> {
+  const { data, error } = await supabaseAdmin.rpc('issue_refresh_token', {
+    p_user_id: userId,
+    p_user_agent: userAgent || null,
+  })
+  if (error) throw new Error('Не удалось выдать refresh-токен')
+  return data as string
+}
+
+/**
+ * К2: Верифицирует refresh-токен и возвращает userId.
+ */
+export async function verifyRefreshToken(
+  supabaseAdmin: any,
+  refreshToken: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseAdmin.rpc('verify_refresh_token', {
+    p_token: refreshToken,
+  })
+  if (error) return null
+  return (data as string) || null
+}
+
+/**
+ * К2: Отзывает refresh-токен.
+ */
+export async function revokeRefreshToken(
+  supabaseAdmin: any,
+  refreshToken: string,
+): Promise<void> {
+  await supabaseAdmin.rpc('revoke_refresh_token', { p_token: refreshToken })
 }
 
 export async function getIdentityUser(supabaseAdmin: any, provider: string, subject: string) {
@@ -211,6 +256,43 @@ export async function unwrapProviderVaultSecret(wrapped: unknown) {
     throw new Error('Не удалось расшифровать recovery-секрет провайдера')
   }
   return new TextDecoder().decode(plain)
+}
+
+/**
+ * К4: Проверяет rate-limit для данного идентификатора.
+ * Возвращает true если лимит НЕ превышен (можно продолжать).
+ */
+export async function checkRateLimit(
+  supabaseAdmin: any,
+  identifier: string,
+  attemptType: string,
+  maxAttempts = 5,
+  windowMinutes = 10,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc('check_rate_limit', {
+    p_identifier: identifier,
+    p_attempt_type: attemptType,
+    p_max_attempts: maxAttempts,
+    p_window_minutes: windowMinutes,
+  })
+  if (error) return true // fail-open: если БД недоступна, пропускаем rate-limit
+  return data === true
+}
+
+/**
+ * К4: Записывает попытку аутентификации для rate-limiting.
+ */
+export async function recordAuthAttempt(
+  supabaseAdmin: any,
+  identifier: string,
+  attemptType: string,
+  success = false,
+): Promise<void> {
+  await supabaseAdmin.rpc('record_auth_attempt', {
+    p_identifier: identifier,
+    p_attempt_type: attemptType,
+    p_success: success,
+  })
 }
 
 export function constantTimeEqual(a: string, b: string): boolean {

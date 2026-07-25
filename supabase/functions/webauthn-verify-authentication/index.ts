@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { verifyAuthenticationResponse } from 'npm:@simplewebauthn/server'
 import { decodeBase64Url } from 'https://deno.land/std@0.224.0/encoding/base64url.ts'
-import { corsHeaders, createAdminClient, issueUserToken, json, prepareUserForAuthentication } from '../_shared/provider-auth.ts'
+import { corsHeaders, createAdminClient, issueUserToken, issueRefreshToken, json, prepareUserForAuthentication } from '../_shared/provider-auth.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -77,7 +77,9 @@ serve(async (req) => {
 
     const effectiveUser = await prepareUserForAuthentication(admin, updated)
     const token = await issueUserToken(effectiveUser, 'passkey')
-    return json({ verified: true, token, user: effectiveUser })
+    // К2: Выдаём refresh-токен
+    const refreshToken = await issueRefreshToken(admin, effectiveUser.id, req.headers.get('user-agent'))
+    return json({ verified: true, token, refreshToken, user: effectiveUser })
   } catch (error: any) {
     return json({ error: error?.message || 'Не удалось войти по Passkey' }, 400)
   }
