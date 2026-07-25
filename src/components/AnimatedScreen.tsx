@@ -25,6 +25,8 @@ const pageTransition = {
 interface AnimatedScreenProps {
   children: ReactNode;
   /** Unique key for AnimatePresence to track mount/unmount */
+  key?: string;
+  /** Unique key for AnimatePresence to track mount/unmount */
   screenKey: string;
   /** Optional custom class names */
   className?: string;
