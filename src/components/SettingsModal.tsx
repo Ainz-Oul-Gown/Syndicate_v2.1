@@ -363,7 +363,7 @@ export default function SettingsModal({
   };
 
   const handleHapticsPowerChange = (value: number) => {
-    const clamped = Math.max(0.5, Math.min(1.5, value));
+    const clamped = Math.max(0.1, Math.min(2.0, value));
     setHapticsPowerState(clamped);
     setHapticsMultiplier(clamped);
   };
@@ -898,13 +898,13 @@ export default function SettingsModal({
                       {/* Filled track */}
                       <div
                         className="absolute h-1.5 bg-primary rounded-full transition-all"
-                        style={{ left: '0%', width: `${((hapticsPower - 0.5) / 1.0) * 100}%` }}
+                        style={{ left: '0%', width: `${((hapticsPower - 0.1) / 1.9) * 100}%` }}
                       />
                       {/* Input */}
                       <input
                         type="range"
-                        min={0.5}
-                        max={1.5}
+                        min={0.1}
+                        max={2.0}
                         step={0.05}
                         value={hapticsPower}
                         onChange={(e) => handleHapticsPowerChange(parseFloat(e.target.value))}
@@ -915,13 +915,13 @@ export default function SettingsModal({
                       {/* Custom thumb */}
                       <div
                         className="absolute w-5 h-5 bg-white rounded-full shadow-lg shadow-primary/30 border-2 border-primary pointer-events-none transition-all"
-                        style={{ left: `calc(${((hapticsPower - 0.5) / 1.0) * 100}% - 10px)` }}
+                        style={{ left: `calc(${((hapticsPower - 0.1) / 1.9) * 100}% - 10px)` }}
                       />
                     </div>
                     {/* Labels */}
                     <div className="flex justify-between mt-1">
-                      <span className="text-[9px] text-slate-600 font-mono">弱</span>
-                      <span className="text-[9px] text-slate-600 font-mono">强</span>
+                      <span className="text-[9px] text-slate-600 font-mono">0.1×</span>
+                      <span className="text-[9px] text-slate-600 font-mono">2.0×</span>
                     </div>
                   </div>
                 )}

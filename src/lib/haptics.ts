@@ -7,20 +7,20 @@ const POWER_MULTIPLIER: Record<HapticsPower, number> = {
 };
 
 /**
- * Read haptics multiplier (0.5–1.5) from localStorage.
+ * Read haptics multiplier (0.1–2.0) from localStorage.
  * Stored as a plain number string, default 1.0.
  */
 export function getHapticsMultiplier(): number {
   const raw = localStorage.getItem('synd_haptics_multiplier');
   if (raw !== null) {
     const n = parseFloat(raw);
-    if (!isNaN(n) && n >= 0.5 && n <= 1.5) return n;
+    if (!isNaN(n) && n >= 0.1 && n <= 2.0) return n;
   }
   return 1.0;
 }
 
 export function setHapticsMultiplier(value: number) {
-  localStorage.setItem('synd_haptics_multiplier', Math.max(0.5, Math.min(1.5, value)).toString());
+  localStorage.setItem('synd_haptics_multiplier', Math.max(0.1, Math.min(2.0, value)).toString());
 }
 
 /** Legacy support — converts multiplier to old type for any remaining callers */
