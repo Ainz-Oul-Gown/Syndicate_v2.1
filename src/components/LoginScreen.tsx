@@ -29,7 +29,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { auth, googleProvider } from '../lib/firebase';
-import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { signInWithPopup } from 'firebase/auth';
 import { supabaseClient } from '../lib/supabase';
 import { base64ToArrayBuffer } from '../lib/crypto';
 import { hapticImpact } from '../lib/haptics';
@@ -95,10 +95,6 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
   const [googleName, setGoogleName] = useState('');
   const [googleInvite, setGoogleInvite] = useState('');
 
-  // Detect WebView (Telegram, etc.) where signInWithPopup fails due to COOP
-  const isWebView = typeof navigator !== 'undefined' &&
-    (/wv|webview/i.test(navigator.userAgent) || !!window.Telegram?.WebApp);
-
 
           
   // WebAuthn / Passkeys States
@@ -123,129 +119,6 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
     setTelegramAction('register');
     setViewMode('telegram_miniapp_register');
   }, [telegramMiniAppContext]);
-
-  // Handle Google redirect result (for WebView environments where popup doesn't work)
-  useEffect(() => {
-    getRedirectResult(auth).then(async (result) => {
-      if (!result) return;
-      // Restore Google auth state saved before redirect
-      const saved = JSON.parse(sessionStorage.getItem('synd_google_redirect') || '{}');
-      sessionStorage.removeItem('synd_google_redirect');
-      const action = saved.action || 'login';
-      const name = saved.name || '';
-      const invite = saved.invite || '';
-
-      try {
-        const firebaseUser = result.user;
-        const firebaseIdToken = await firebaseUser.getIdToken(true);
-        const accountEmail = firebaseUser.email || 'unknown@gmail.com';
-        const accountName = action === 'register'
-          ? (name || firebaseUser.displayName || 'Google User')
-          : (firebaseUser.displayName || 'Google User');
-
-        if (action === 'login') {
-          const authResult = await googleAuthCall(firebaseIdToken, false);
-          const userProfile = authResult.user;
-          const stableId = Number(userProfile?.tg_id);
-          if (!Number.isSafeInteger(stableId)) throw new Error('Сервер вернул некорректный ID профиля');
-
-          const keysPayload = JSON.parse(userProfile.public_key || '{}');
-          if (!keysPayload.vault) throw new Error('В профиле отсутствует зашифрованный крипто-сейф');
-
-          let decryptedKeys: { rsaPrivJwk: JsonWebKey; ecdsaPrivJwk: JsonWebKey } | null = null;
-          if (authResult.provider?.vaultSecret) {
-            decryptedKeys = await decryptVault(
-              await deriveProviderVaultKey(authResult.provider.vaultSecret),
-              keysPayload.vault,
-            );
-          }
-          if (!decryptedKeys) {
-            decryptedKeys = await decryptVault(
-              await deriveAesKeyFromSeed(`google-auth-key-derivation-salt-${firebaseUser.uid}`),
-              keysPayload.vault,
-            );
-          }
-          if (!decryptedKeys && accountEmail) {
-            decryptedKeys = await decryptVault(
-              await deriveAesKeyFromSeed(`google-auth-key-derivation-salt-${accountEmail}`),
-              keysPayload.vault,
-            );
-          }
-          if (!decryptedKeys) throw new Error('Не удалось дешифровать крипто-сейф Google-аккаунта');
-
-          const rsaJwk = decryptedKeys.rsaPrivJwk || (decryptedKeys as any).rsa;
-          const ecdsaJwk = decryptedKeys.ecdsaPrivJwk || (decryptedKeys as any).ecdsa;
-          if (!rsaJwk || !ecdsaJwk) throw new Error('Неверный формат расшифрованных ключей Google');
-
-          const impRsa = await window.crypto.subtle.importKey(
-            'jwk', rsaJwk, { name: 'RSA-OAEP', hash: 'SHA-256' }, true, ['decrypt'],
-          );
-          const impEcdsa = await window.crypto.subtle.importKey(
-            'jwk', ecdsaJwk, { name: 'ECDSA', namedCurve: ecdsaJwk.crv || 'P-256' }, true, ['sign'],
-          );
-          await idbKeyval.set(`my_private_key_${stableId}`, impRsa);
-          await idbKeyval.set(`my_sign_key_${stableId}`, impEcdsa);
-          localStorage.setItem('synd_my_pubkey_cache', JSON.stringify(keysPayload.legacy?.rsa || {}));
-          localStorage.setItem('synd_my_pubsign_cache', JSON.stringify(keysPayload.legacy?.ecdsa || {}));
-          localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: userProfile.first_name, method: 'google' }));
-          hapticImpact("success");
-          onLoginSuccess(authResult.token, null, { id: stableId, first_name: userProfile.first_name }, authResult.refreshToken);
-        } else {
-          // Register flow after redirect
-          const rsaKeyPair = await window.crypto.subtle.generateKey(
-            { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
-            true,
-            ['encrypt', 'decrypt'],
-          ) as CryptoKeyPair;
-          const ecdsaKeyPair = await window.crypto.subtle.generateKey(
-            { name: 'ECDSA', namedCurve: 'P-256' },
-            true,
-            ['sign', 'verify'],
-          ) as CryptoKeyPair;
-
-          const rsaPubJwk = await window.crypto.subtle.exportKey('jwk', rsaKeyPair.publicKey);
-          const rsaPrivJwk = await window.crypto.subtle.exportKey('jwk', rsaKeyPair.privateKey);
-          const ecdsaPubJwk = await window.crypto.subtle.exportKey('jwk', ecdsaKeyPair.publicKey);
-          const ecdsaPrivJwk = await window.crypto.subtle.exportKey('jwk', ecdsaKeyPair.privateKey);
-          const providerVaultSecret = generateProviderVaultSecret();
-          const encryptedVaultJson = await encryptVault(
-            await deriveProviderVaultKey(providerVaultSecret),
-            rsaPrivJwk,
-            ecdsaPrivJwk,
-          );
-          const publicKeysPayload = {
-            legacy: { rsa: rsaPubJwk, ecdsa: ecdsaPubJwk },
-            vault: encryptedVaultJson,
-          };
-
-          const authResult = await googleAuthCall(
-            firebaseIdToken,
-            true,
-            accountName,
-            publicKeysPayload,
-            invite,
-            providerVaultSecret,
-          );
-          const stableId = Number(authResult.user?.tg_id);
-          if (!Number.isSafeInteger(stableId)) throw new Error('Сервер вернул некорректный ID профиля');
-
-          await idbKeyval.set(`my_private_key_${stableId}`, rsaKeyPair.privateKey);
-          await idbKeyval.set(`my_sign_key_${stableId}`, ecdsaKeyPair.privateKey);
-          localStorage.setItem('synd_my_pubkey_cache', JSON.stringify(rsaPubJwk));
-          localStorage.setItem('synd_my_pubsign_cache', JSON.stringify(ecdsaPubJwk));
-          localStorage.setItem('synd_alt_user', JSON.stringify({ id: stableId, first_name: authResult.user.first_name, method: 'google' }));
-          hapticImpact("success");
-          onLoginSuccess(authResult.token, null, { id: stableId, first_name: authResult.user.first_name }, authResult.refreshToken);
-        }
-      } catch (err: any) {
-        console.error('Google redirect auth error', err);
-        setErrorMessage(`Ошибка Google OAuth: ${err.message}`);
-      }
-    }).catch((err) => {
-      console.error('getRedirectResult error', err);
-      setErrorMessage(`Ошибка Google OAuth: ${err.message}`);
-    });
-  }, []);
 
   // Email States
   const [emailInput, setEmailInput] = useState('');
@@ -1431,18 +1304,6 @@ export function LoginScreen({ onLoginSuccess, isError, loadingText, deferredProm
     }
 
     try {
-      // In WebView (Telegram), signInWithPopup fails due to COOP policy.
-      // Use signInWithRedirect instead — saves state to sessionStorage,
-      // redirects to Google, then getRedirectResult restores the flow.
-      if (isWebView) {
-        sessionStorage.setItem('synd_google_redirect', JSON.stringify({
-          action: googleAction,
-          name: googleName,
-          invite: googleInvite,
-        }));
-        await signInWithRedirect(auth, googleProvider);
-        return; // Page will redirect — code below won't execute
-      }
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
       const firebaseIdToken = await firebaseUser.getIdToken(true);
