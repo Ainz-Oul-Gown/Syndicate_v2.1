@@ -94,13 +94,13 @@ export async function nativeStartRegistration(optionsJSON: RegistrationOptionsJS
     hints: ['client-device'],
   } as any;
 
-  // Use server-provided authenticatorSelection AS-IS.
-  // Do NOT set authenticatorAttachment: 'platform' — it causes
-  // "credential manager" errors on Android WebView / PWA.
-  // The hints:['client-device'] below already tells the browser to prefer
-  // the platform authenticator (fingerprint/FaceID) without forcing it.
+  // Force platform authenticator (fingerprint/FaceID) without extra options.
+  // authenticatorAttachment:'platform' is REQUIRED — without it, the browser
+  // offers QR/NFC cross-device flow instead of biometric on Android.
+  // hints:['client-device'] reinforces this preference.
   publicKey.authenticatorSelection = {
-    ...optionsJSON.authenticatorSelection,
+    authenticatorAttachment: 'platform',
+    userVerification: 'preferred',
   };
 
   // Add excludeCredentials if present

@@ -217,6 +217,7 @@ hapticImpact("success");
       {isScanning ? (
         <div className="w-full aspect-square bg-black rounded-3xl overflow-hidden relative border-2 border-primary mb-6 glow-primary">
           <Scanner 
+            formats={['qr_code']}
             onScan={(result) => {
               if (result && result.length > 0) {
                 setScannerError(null);
@@ -224,8 +225,7 @@ hapticImpact("success");
               }
             }}
             onError={(error) => {
-              // Camera may not be available in Telegram WebView or without HTTPS
-              const msg = typeof error === 'string' ? error : error?.message || 'Не удалось открыть камеру';
+              const msg = typeof error === 'string' ? error : error?.message || 'Не удалось распознать QR-код';
               console.warn('QR Scanner error:', msg);
               setScannerError(msg);
             }}
