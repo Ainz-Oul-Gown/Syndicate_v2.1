@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { getCorsHeaders, createAdminClient, json, verifySyndicateToken } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, createAdminClient, json, verifySyndicateToken, findEcdsaSigningKey } from '../_shared/provider-auth.ts'
 
 function decodeBase64(value: unknown) {
   if (typeof value !== 'string' || value.length > 2048) throw new Error('Некорректная подпись')
@@ -38,8 +38,7 @@ serve(async (req) => {
 
     let keys: any
     try { keys = JSON.parse(user?.public_key || '{}') } catch { throw new Error('Повреждён публичный ключ') }
-    const jwk = keys?.legacy?.ecdsa
-    if (!jwk) throw new Error('Ключ подписи не настроен')
+    const jwk = findEcdsaSigningKey(keys)
     const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: jwk.crv || 'P-256' }, false, ['verify'])
     const proof = JSON.stringify({ requestId, status, encryptedMasterKeys, approverDeviceId })
     const valid = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, decodeBase64(signature), new TextEncoder().encode(proof))

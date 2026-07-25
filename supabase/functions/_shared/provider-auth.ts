@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.7'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
 
 export function getCorsHeaders(origin?: string | null) {
@@ -35,23 +35,85 @@ export function createAdminClient() {
   return createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
+/**
+ * С1: stableNumericId с pepper из секретной переменной окружения.
+ * Без pepper: хэш предсказуем из username/email → enumeration.
+ * С pepper: хэш детерминирован только при знании серверного секрета.
+ */
 export function stableNumericId(value: string): number {
+  const pepper = Deno.env.get('STABLE_ID_PEPPER') || ''
   let hash = 0
-  const clean = value.trim().toLowerCase()
+  const clean = pepper + value.trim().toLowerCase()
   for (let index = 0; index < clean.length; index += 1) {
     hash = ((hash << 5) - hash + clean.charCodeAt(index)) | 0
   }
   return Math.abs(hash) + 100_000_000
 }
 
+/**
+ * С4: JSON-schema валидация контейнера ключей.
+ * Проверяет наличие корректных JWK-полей (kty, crv/n/e/x/y) для RSA и ECDSA.
+ */
 export function normalizePublicKeysPayload(value: unknown): string | null {
   if (value == null) return null
   const serialized = typeof value === 'string' ? value : JSON.stringify(value)
   if (serialized.length > 250_000) throw new Error('Контейнер ключей слишком большой')
-  let parsed: unknown
+  let parsed: any
   try { parsed = JSON.parse(serialized) } catch { throw new Error('Некорректный формат контейнера ключей') }
   if (!parsed || typeof parsed !== 'object') throw new Error('Некорректный формат контейнера ключей')
+
+  // С4: Валидация структуры JWK для legacy/master ключей
+  function validateJwk(jwk: any, slotName: string) {
+    if (!jwk || typeof jwk !== 'object') return // опциональный слот
+    if (typeof jwk.kty !== 'string') throw new Error(`${slotName}: отсутствует поле kty`)
+    if (jwk.kty === 'RSA') {
+      if (typeof jwk.n !== 'string' || typeof jwk.e !== 'string') {
+        throw new Error(`${slotName}: RSA-ключ должен содержать n и e`)
+      }
+    } else if (jwk.kty === 'EC') {
+      if (typeof jwk.crv !== 'string' || typeof jwk.x !== 'string' || typeof jwk.y !== 'string') {
+        throw new Error(`${slotName}: EC-ключ должен содержать crv, x и y`)
+      }
+    } else {
+      throw new Error(`${slotName}: неподдерживаемый тип ключа ${jwk.kty}`)
+    }
+  }
+
+  // Проверяем legacy ECDSA если есть
+  if (parsed.legacy?.ecdsa) validateJwk(parsed.legacy.ecdsa, 'legacy.ecdsa')
+  if (parsed.legacy?.rsa) validateJwk(parsed.legacy.rsa, 'legacy.rsa')
+  // Проверяем master ключи если есть
+  if (parsed.master?.ecdsa) validateJwk(parsed.master.ecdsa, 'master.ecdsa')
+  if (parsed.master?.rsa) validateJwk(parsed.master.rsa, 'master.rsa')
+  // Проверяем passkeys если есть
+  if (Array.isArray(parsed.passkeys)) {
+    for (let i = 0; i < parsed.passkeys.length; i++) {
+      const pk = parsed.passkeys[i]
+      if (!pk?.id || !pk?.publicKey) throw new Error(`passkeys[${i}]: отсутствуют id или publicKey`)
+    }
+  }
+
   return serialized
+}
+
+/**
+ * С5: Поиск подписывающего ECDSA ключа в контейнере.
+ * Проверяет оба слота: master (приоритет) и legacy.
+ * Возвращает JWK или бросает ошибку.
+ */
+export function findEcdsaSigningKey(publicKeyPayload: any): any {
+  const jwk = publicKeyPayload?.master?.ecdsa || publicKeyPayload?.legacy?.ecdsa
+  if (!jwk) throw new Error('Ключ подписи не настроен')
+  return jwk
+}
+
+/**
+ * С5: Поиск RSA ключа для расшифровки.
+ * Проверяет оба слота: master (приоритет) и legacy.
+ */
+export function findRsaDecryptionKey(publicKeyPayload: any): any {
+  const jwk = publicKeyPayload?.master?.rsa || publicKeyPayload?.legacy?.rsa
+  return jwk || null
 }
 
 export async function consumeRegistrationInvite(supabaseAdmin: any, rawCode: unknown, consumedBy?: number) {
@@ -304,7 +366,19 @@ export function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-export async function verifySyndicateToken(token: unknown) {
+/**
+ * В4: Верификация JWT + централизованная проверка account_state и session_version.
+ *
+ * Если передан supabaseAdmin — выполняет DB-проверку (account_state, session_version).
+ * Если нет — только JWT-верификация (для функций, которые проверяют state самостоятельно).
+ *
+ * @returns { userId, stableId, provider, sessionVersion, user? }
+ *   user возвращается только при передаче supabaseAdmin (для экономии DB-запроса).
+ */
+export async function verifySyndicateToken(
+  token: unknown,
+  supabaseAdmin?: any,
+): Promise<{ userId: string; stableId: number; provider: string; sessionVersion: number; user?: any }> {
   if (typeof token !== 'string' || token.length < 20 || token.length > 10_000) throw new Error('Отсутствует токен Syndicate')
   const secret = Deno.env.get('JWT_SECRET')
   if (!secret) throw new Error('Не настроен JWT_SECRET')
@@ -319,5 +393,24 @@ export async function verifySyndicateToken(token: unknown) {
   }
   const sessionVersion = Number(result.payload.session_version)
   if (!Number.isSafeInteger(sessionVersion) || sessionVersion < 1) throw new Error('Токен не поддерживает отзыв сессии')
+
+  // В4: Если передан supabaseAdmin — проверяем account_state и session_version через БД
+  if (supabaseAdmin) {
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('id, tg_id, first_name, status, account_state, session_version, public_key, created_at')
+      .eq('tg_id', tgId)
+      .maybeSingle()
+    if (error) throw error
+    if (!user) throw new Error('Пользователь не найден')
+    if (Number(user.session_version) !== sessionVersion) throw new Error('Сессия отозвана')
+
+    const accountState = user.account_state || (user.status === 'blocked' ? 'blocked' : 'active')
+    if (accountState === 'blocked' || accountState === 'deleted' || user.status === 'blocked') {
+      throw new Error('Аккаунт заблокирован')
+    }
+    return { userId: sub, stableId: tgId as number, provider, sessionVersion, user }
+  }
+
   return { userId: sub, stableId: tgId as number, provider, sessionVersion }
 }

@@ -7,8 +7,10 @@ Deno.serve(async (req) => {
     const auth = req.headers.get('Authorization') || '';
     if (!auth.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401, origin);
 
-    const { userId, stableId, sessionVersion } = await verifySyndicateToken(auth.slice(7));
-    const tgId = stableId;
+    // В4: Централизованная проверка JWT + account_state + session_version
+    const admin = createAdminClient();
+    const { stableId: tgId, sessionVersion, user } = await verifySyndicateToken(auth.slice(7), admin);
+    if (!user) return json({ error: 'Session revoked' }, 401, origin);
 
     const { messageId, chatId, oldPath, newPath, encryptedText } = await req.json();
     if (![messageId, chatId, oldPath, newPath, encryptedText].every((v) => typeof v === 'string' && v.length > 0)) {
@@ -16,14 +18,6 @@ Deno.serve(async (req) => {
     }
     if (oldPath.includes('/') || !newPath.startsWith(`${chatId}/${tgId}/`) || !newPath.endsWith('.bin')) {
       return json({ error: 'Invalid storage path' }, 400, origin);
-    }
-
-    const admin = createAdminClient();
-    const { data: user } = await admin.from('users').select('session_version, status, account_state').eq('tg_id', tgId).maybeSingle();
-    const accountState = user?.account_state || (user?.status === 'blocked' ? 'blocked' : 'active');
-    if (!user || Number(user.session_version) !== sessionVersion
-      || accountState === 'blocked' || accountState === 'deleted' || accountState === 'deactivated') {
-      return json({ error: 'Session revoked' }, 401, origin);
     }
 
     const { data: message, error: messageError } = await admin

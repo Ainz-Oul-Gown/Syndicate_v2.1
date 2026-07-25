@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.7'
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
-import { getCorsHeaders, json, issueRefreshToken } from '../_shared/provider-auth.ts'
+import { getCorsHeaders, json, issueRefreshToken, findEcdsaSigningKey } from '../_shared/provider-auth.ts'
 
 function base64ToBytes(value: string): Uint8Array {
   if (typeof value !== 'string' || value.length < 16 || value.length > 1024) throw new Error('Некорректная подпись');
@@ -53,8 +53,7 @@ serve(async (req) => {
 
     let payload: any;
     try { payload = JSON.parse(dbUser.public_key || '{}'); } catch { throw new Error('Повреждён публичный ключ пользователя'); }
-    const publicJwk = payload?.legacy?.ecdsa;
-    if (!publicJwk) throw new Error('Для аккаунта не настроен ключ подписи');
+    const publicJwk = findEcdsaSigningKey(payload);
 
     const publicKey = await crypto.subtle.importKey(
       'jwk',
