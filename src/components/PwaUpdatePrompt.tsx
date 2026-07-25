@@ -4,10 +4,13 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { hapticImpact } from '../lib/haptics';
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+const UPDATE_COOLDOWN_KEY = 'synd_pwa_last_update';
+const UPDATE_COOLDOWN_MS = 30_000; // 30 seconds after applying an update, ignore re-detection
 
 export default function PwaUpdatePrompt() {
   const [isApplying, setIsApplying] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -15,6 +18,15 @@ export default function PwaUpdatePrompt() {
     immediate: true,
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
+
+      // After applying an update, skip re-checking for a cooldown period.
+      // This prevents the infinite loop where the newly-activated SW is
+      // immediately detected as "another update" by registration.update().
+      const lastUpdate = parseInt(localStorage.getItem(UPDATE_COOLDOWN_KEY) || '0', 10);
+      if (Date.now() - lastUpdate < UPDATE_COOLDOWN_MS) {
+        console.debug('[PWA] Update check skipped — cooldown active');
+        return;
+      }
 
       const checkForUpdate = () => {
         if (navigator.onLine) {
@@ -63,11 +75,11 @@ export default function PwaUpdatePrompt() {
     setIsApplying(true);
     hapticImpact('warning');
 
-    // Use the standard Vite PWA mechanism:
-    // updateServiceWorker(true) calls skipWaiting() + clients.claim()
-    // on the new SW, then does a soft reload.
-    // The new SW is active BEFORE reload, so auth-refresh works
-    // because cached assets and the precache manifest are served correctly.
+    // Mark the cooldown so the re-registered SW doesn't trigger needRefresh
+    localStorage.setItem(UPDATE_COOLDOWN_KEY, Date.now().toString());
+    setNeedRefresh(false);
+
+    // Standard Vite PWA update: skipWaiting → clients.claim → soft reload
     updateServiceWorker(true);
   };
 
