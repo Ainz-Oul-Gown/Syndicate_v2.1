@@ -17,6 +17,7 @@ export default function DevicesScreen({ userId, onBack }: DevicesScreenProps) {
   const [devices, setDevices] = useState<UserDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const [showRuleInfo, setShowRuleInfo] = useState(false);
 
   
@@ -218,12 +219,24 @@ hapticImpact("success");
           <Scanner 
             onScan={(result) => {
               if (result && result.length > 0) {
+                setScannerError(null);
                 handleScan(result[0].rawValue);
               }
-            }} 
+            }}
+            onError={(error) => {
+              // Camera may not be available in Telegram WebView or without HTTPS
+              const msg = typeof error === 'string' ? error : error?.message || 'Не удалось открыть камеру';
+              console.warn('QR Scanner error:', msg);
+              setScannerError(msg);
+            }}
           />
+          {scannerError && (
+            <div className="absolute top-4 left-4 right-4 bg-rose-900/90 text-rose-200 text-xs font-mono p-3 rounded-xl text-center">
+              Камера недоступна: {scannerError}
+            </div>
+          )}
           <button 
-            onClick={() => setIsScanning(false)}
+            onClick={() => { setIsScanning(false); setScannerError(null); }}
             className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-full shadow-lg transition active:scale-95"
           >
             Отмена
