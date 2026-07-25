@@ -852,78 +852,81 @@ export default function SettingsModal({
         <div className="flex flex-col items-center gap-5 max-w-md mx-auto w-full pb-10">
 
           {/* ── Profile ── */}
-          <div className="flex flex-col items-center gap-3 pt-2 pb-4 w-full">
-            {/* Avatar — large */}
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-white font-bold text-3xl flex items-center justify-center uppercase shadow-xl shadow-primary/20 select-none ring-4 ring-slate-900/60">
+          <div className="flex items-center gap-4 pt-2 pb-4 w-full">
+            {/* Avatar — left */}
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-white font-bold text-2xl flex items-center justify-center uppercase shadow-xl shadow-primary/20 select-none ring-3 ring-slate-900/60 shrink-0">
               {userName ? userName.charAt(0) : '?'}
             </div>
 
-            {/* Name — large, with edit */}
-            {isEditingName ? (
-              <div className="flex flex-col gap-2 w-full max-w-xs animate-fade-in">
+            {/* Name + ID + status — right */}
+            <div className="flex flex-col min-w-0 flex-grow">
+              {/* Name with edit */}
+              {isEditingName ? (
+                <div className="flex flex-col gap-2 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => { setNameError(null); setNewName(e.target.value); }}
+                      placeholder="Новое имя..."
+                      className="flex-grow bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/60 min-w-0"
+                      maxLength={25}
+                    />
+                    <button
+                      onClick={handleSaveName}
+                      className="bg-primary hover:bg-primary-hover text-white font-bold text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
+                    >
+                      ОК
+                    </button>
+                    <button
+                      onClick={() => setIsEditingName(false)}
+                      className="bg-slate-900 border border-slate-800 hover:text-slate-300 text-slate-400 text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                  {nameError && (
+                    <span className="text-[10px] text-rose-400 font-semibold flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> {nameError}
+                    </span>
+                  )}
+                </div>
+              ) : (
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => { setNameError(null); setNewName(e.target.value); }}
-                    placeholder="Новое имя..."
-                    className="flex-grow bg-slate-900 border border-slate-800 text-slate-100 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/60"
-                    maxLength={25}
-                  />
+                  <span className="font-bold text-slate-100 text-lg tracking-tight truncate">{userName}</span>
                   <button
-                    onClick={handleSaveName}
-                    className="bg-primary hover:bg-primary-hover text-white font-bold text-xs px-3.5 py-2 rounded-xl transition active:scale-95 cursor-pointer"
+                    onClick={handleStartEditName}
+                    className="text-slate-500 hover:text-slate-300 transition p-1 cursor-pointer shrink-0"
+                    title="Изменить имя"
                   >
-                    ОК
-                  </button>
-                  <button
-                    onClick={() => setIsEditingName(false)}
-                    className="bg-slate-900 border border-slate-800 hover:text-slate-300 text-slate-400 text-xs px-3 py-2 rounded-xl transition active:scale-95 cursor-pointer"
-                  >
-                    Отмена
+                    <Edit2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                {nameError && (
-                  <span className="text-[10px] text-rose-400 font-semibold flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> {nameError}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-100 text-xl tracking-tight">{userName}</span>
+              )}
+
+              {/* ID — tap to copy */}
+              {!isEditingName && (
                 <button
-                  onClick={handleStartEditName}
-                  className="text-slate-500 hover:text-slate-300 transition p-1 cursor-pointer"
-                  title="Изменить имя"
+                  onClick={() => {
+                    navigator.clipboard.writeText(userId.toString());
+                    setCopiedId(true);
+                    setTimeout(() => setCopiedId(false), 2000);
+                    hapticImpact("success");
+                  }}
+                  className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition cursor-pointer active:scale-95 mt-0.5"
                 >
-                  <Edit2 className="w-4 h-4" />
+                  <span className="text-[11px] font-mono font-bold">{userId}</span>
+                  {copiedId ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
                 </button>
+              )}
+
+              {/* Status */}
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                <span className="text-[10px] text-primary font-mono tracking-wider font-semibold uppercase">
+                  Канал защищен
+                </span>
               </div>
-            )}
-
-            {/* ID — small, tap to copy */}
-            {!isEditingName && (
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(userId.toString());
-                  setCopiedId(true);
-                  setTimeout(() => setCopiedId(false), 2000);
-                  hapticImpact("success");
-                }}
-                className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition cursor-pointer active:scale-95"
-              >
-                <span className="text-xs font-mono font-bold">{userId}</span>
-                {copiedId ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
-              </button>
-            )}
-
-            {/* Status */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-              <span className="text-[10px] text-primary font-mono tracking-wider font-semibold uppercase">
-                Канал защищен
-              </span>
             </div>
           </div>
 
