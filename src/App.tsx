@@ -1832,21 +1832,21 @@ export default function App() {
                                             onClick={handleOpenSavedMessages}
                                             className="flex items-center justify-between p-3.5 bg-slate-900/20 hover:bg-slate-900/40 border border-slate-900/60 hover:border-slate-900 rounded-2xl transition-all duration-200 cursor-pointer group shadow-sm active:scale-[0.99]"
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10.5 h-10.5 rounded-xl bg-primary-light text-primary flex items-center justify-center shadow-inner group-hover:scale-105 transition">
-                                                    <Bookmark className="w-5.5 h-5.5 fill-current" />
-                                                </div>
-                                                <div className="flex flex-col min-w-0">
-                                                    <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5">
-                                                        Избранное
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                                    </div>
-                                                    <div className={`text-[11px] mt-0.5 truncate ${savedDraft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
-                                                        {savedDraft ? `Черновик: ${formatDraftPreview(savedDraft.text)}` : 'Личный архив заметок, файлов и аудио'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-slate-500 group-hover:text-primary transition">
+                                             <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                 <div className="w-10.5 h-10.5 rounded-xl bg-primary-light text-primary flex items-center justify-center shadow-inner group-hover:scale-105 transition flex-shrink-0">
+                                                     <Bookmark className="w-5.5 h-5.5 fill-current" />
+                                                 </div>
+                                                  <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                                     <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5 min-w-0">
+                                                         <span className="truncate">Избранное</span>
+                                                         <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                                     </div>
+                                                     <div className={`text-[11px] mt-0.5 truncate min-w-0 ${savedDraft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                                                         {savedDraft ? <span className="truncate">Черновик: {formatDraftPreview(savedDraft.text)}</span> : <span className="truncate">Личный архив заметок, файлов и аудио</span>}
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                             <div className="flex items-center gap-1 text-slate-500 group-hover:text-primary transition flex-shrink-0">
                                                 <span className="text-[10px] font-mono font-bold tracking-widest mr-1 text-slate-600">E2EE</span>
                                                 <ChevronRight className="w-4 h-4" />
                                             </div>
@@ -1863,40 +1863,40 @@ export default function App() {
                                                 onClick={() => handleOpenGroupChat(g)}
                                                 className="flex items-center justify-between p-3.5 bg-slate-900/20 hover:bg-slate-900/40 border border-slate-900/60 hover:border-slate-900 rounded-2xl transition-all duration-200 cursor-pointer group shadow-sm active:scale-[0.99] animate-fade-in"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10.5 h-10.5 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-extrabold text-base shadow-inner uppercase group-hover:scale-105 transition">
-                                                        {g.name.charAt(0)}
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5">
-                                                            {g.name}
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                        </div>
-                                                        <div className={`text-[11px] mt-0.5 truncate flex items-center gap-1 ${draft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
-                                                            {draft ? <>Черновик: {formatDraftPreview(draft.text)}</> : <><Users className="w-3 h-3 text-slate-500" /> Групповой защищенный канал</>}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-slate-500 group-hover:text-primary transition">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(event) => { event.stopPropagation(); toggleChatPin(g.id); }}
-                                                        className={`p-1 rounded-md transition ${pinnedChatIds.has(g.id) ? 'text-amber-400 bg-amber-400/10' : 'text-slate-600 hover:text-slate-300'}`}
-                                                        aria-label={pinnedChatIds.has(g.id) ? 'Открепить чат' : 'Закрепить чат'}
-                                                        title={pinnedChatIds.has(g.id) ? 'Открепить чат' : 'Закрепить чат'}
-                                                    >
-                                                        <Pin className={`w-3.5 h-3.5 ${pinnedChatIds.has(g.id) ? 'fill-current' : ''}`} />
-                                                    </button>
-                                                    {unreadChatIds.has(g.id) && (
-                                                        <span
-                                                            className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(34,211,238,0.65)] flex-shrink-0"
-                                                            role="status"
-                                                            aria-label="Есть новые сообщения"
-                                                        />
-                                                    )}
-                                                    <span className="text-[10px] font-mono font-bold tracking-widest mr-1 text-slate-600">SECURE</span>
-                                                    <ChevronRight className="w-4 h-4" />
-                                                </div>
+                                                 <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                     <div className="w-10.5 h-10.5 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-extrabold text-base shadow-inner uppercase group-hover:scale-105 transition flex-shrink-0">
+                                                         {g.name.charAt(0)}
+                                                     </div>
+                                                      <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                                         <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5 min-w-0">
+                                                             <span className="truncate">{g.name}</span>
+                                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                                                         </div>
+                                                         <div className={`text-[11px] mt-0.5 truncate flex items-center gap-1 min-w-0 ${draft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                                                             {draft ? <>Черновик: {formatDraftPreview(draft.text)}</> : <><Users className="w-3 h-3 text-slate-500 flex-shrink-0" /> <span className="truncate">Групповой защищенный канал</span></>}
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                                 <div className="flex items-center gap-2 text-slate-500 group-hover:text-primary transition flex-shrink-0">
+                                                     <button
+                                                         type="button"
+                                                         onClick={(event) => { event.stopPropagation(); toggleChatPin(g.id); }}
+                                                         className={`p-1 rounded-md transition ${pinnedChatIds.has(g.id) ? 'text-amber-400 bg-amber-400/10' : 'text-slate-600 hover:text-slate-300'}`}
+                                                         aria-label={pinnedChatIds.has(g.id) ? 'Открепить чат' : 'Закрепить чат'}
+                                                         title={pinnedChatIds.has(g.id) ? 'Открепить чат' : 'Закрепить чат'}
+                                                     >
+                                                         <Pin className={`w-3.5 h-3.5 ${pinnedChatIds.has(g.id) ? 'fill-current' : ''}`} />
+                                                     </button>
+                                                     {unreadChatIds.has(g.id) && (
+                                                         <span
+                                                             className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(34,211,238,0.65)] flex-shrink-0"
+                                                             role="status"
+                                                             aria-label="Есть новые сообщения"
+                                                         />
+                                                     )}
+                                                     <span className="text-[10px] font-mono font-bold tracking-widest mr-1 text-slate-600 flex-shrink-0">SECURE</span>
+                                                     <ChevronRight className="w-4 h-4 flex-shrink-0" />
+                                                 </div>
                                             </div>
                                             );
                                         })}
@@ -1911,21 +1911,21 @@ export default function App() {
                                                 onClick={() => handleOpenPrivateChat(f)}
                                                 className="flex items-center justify-between p-3.5 bg-slate-900/20 hover:bg-slate-900/40 border border-slate-900/60 hover:border-slate-900 rounded-2xl transition-all duration-200 cursor-pointer group shadow-sm active:scale-[0.99] animate-fade-in"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10.5 h-10.5 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-base shadow-inner uppercase group-hover:scale-105 transition">
-                                                        {f.first_name.charAt(0)}
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5">
-                                                            {f.first_name}
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                                                        </div>
-                                                        <div className={`text-[11px] mt-0.5 truncate flex items-center gap-1 ${draft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
-                                                            {draft ? <>Черновик: {formatDraftPreview(draft.text)}</> : <><Lock className="w-3 h-3 text-slate-500" /> Личный зашифрованный чат</>}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-slate-500 group-hover:text-primary transition">
+                                                 <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                     <div className="w-10.5 h-10.5 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-base shadow-inner uppercase group-hover:scale-105 transition flex-shrink-0">
+                                                         {f.first_name.charAt(0)}
+                                                     </div>
+                                                      <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                                         <div className="font-bold text-slate-100 text-sm flex items-center gap-1.5 min-w-0">
+                                                             <span className="truncate">{f.first_name}</span>
+                                                             <span className="w-1.5 h-1.5 rounded-full bg-slate-600 flex-shrink-0" />
+                                                         </div>
+                                                         <div className={`text-[11px] mt-0.5 truncate flex items-center gap-1 min-w-0 ${draft ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                                                             {draft ? <>Черновик: {formatDraftPreview(draft.text)}</> : <><Lock className="w-3 h-3 text-slate-500 flex-shrink-0" /> <span className="truncate">Личный зашифрованный чат</span></>}
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                                 <div className="flex items-center gap-2 text-slate-500 group-hover:text-primary transition flex-shrink-0">
                                                     {privateChatByFriendId[f.tg_id] && (
                                                         <button
                                                             type="button"
