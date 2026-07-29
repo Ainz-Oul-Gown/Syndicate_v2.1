@@ -522,15 +522,10 @@ body {
   }
 }
 
-/* ── iOS Safe Area: safe-area-inset-top for fullscreen fixed overlays ── */
+/* ── iOS Safe Area: CSS custom properties for use in Tailwind classes ── */
 @supports (padding: env(safe-area-inset-top)) {
-  /* Top-aligned fullscreen modals (flex-col without justify-center) */
-  .fixed.inset-0 {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-  /* Centered overlays — compensate: remove extra top, keep bottom safe */
-  .fixed.inset-0.justify-center,
-  .fixed.inset-0.items-center {
-    padding-top: 0;
+  :root {
+    --sat: env(safe-area-inset-top);
+    --sab: env(safe-area-inset-bottom);
   }
 }

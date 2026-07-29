@@ -96,7 +96,7 @@ export default function CurrenciesScreen({ userId, onBack }: CurrenciesScreenPro
   return (
     <div className="flex flex-col h-full bg-slate-950 text-slate-100 select-none animate-fade-in font-sans max-w-lg mx-auto w-full px-2">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-900 shrink-0">
+      <div className="flex items-center gap-3 px-4 pb-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
         <button
           onClick={onBack}
           className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"

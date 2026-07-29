@@ -14,7 +14,7 @@ export interface ChatHeaderProps {
 
 export default function ChatHeader({ chat, chatFingerprint, groupName, isGroup, onBack, onOpenInfo, onOpenSearch, onOpenDebts }: ChatHeaderProps) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-900 pb-3 p-4 bg-slate-900/40 relative z-10 flex-shrink-0">
+    <div className="flex items-center justify-between border-b border-slate-900 pb-3 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-slate-900/40 relative z-10 flex-shrink-0">
       <button onClick={onBack} className="text-primary hover:text-primary-hover font-medium flex items-center focus:outline-none">
         <ChevronLeft className="w-6 h-6" />
       </button>

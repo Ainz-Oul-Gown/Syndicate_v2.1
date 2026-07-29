@@ -24,7 +24,7 @@ export default function AddDebtScreen({
   const isValid = !isNaN(rubles) && rubles > 0;
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950 p-5 overflow-y-auto flex flex-col font-sans animate-fade-in">
+        <div className="fixed inset-0 z-[1000] bg-slate-950 px-5 pb-5 pt-[calc(1.25rem+var(--sat,0px))] overflow-y-auto flex flex-col font-sans animate-fade-in">
       <div className="max-w-md mx-auto w-full flex flex-col h-full">
         <div className="flex items-center justify-between pb-4 border-b border-slate-900 mb-6 shrink-0">
           <button onClick={onBack} className="text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-900 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
