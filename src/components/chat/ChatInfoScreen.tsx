@@ -37,7 +37,7 @@ export default function ChatInfoScreen({
   onScrollToMessage,
 }: ChatInfoScreenProps) {
   return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950 px-5 pb-5 pt-[calc(1.25rem+var(--sat,0px))] flex flex-col font-sans animate-fade-in">
+    <div className="fixed inset-0 z-[1000] bg-slate-950 px-5 pb-[calc(1.25rem+var(--sab,0px))] pt-[calc(1.25rem+var(--sat,0px))] flex flex-col font-sans animate-fade-in">
       <div className="max-w-md mx-auto w-full flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between pb-4 border-b border-slate-900 mb-8 shrink-0">
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-900 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer">

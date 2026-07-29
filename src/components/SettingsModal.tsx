@@ -490,22 +490,22 @@ export default function SettingsModal({
     <>
     {/* ── External screens (full-screen wrappers) ── */}
     {activeScreen === 'currencies' && (
-      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in pb-[var(--sab,0px)]">
         <CurrenciesScreen userId={userId} onBack={() => setActiveScreen('main')} />
       </div>
     )}
     {activeScreen === 'devices' && (
-      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in pb-[var(--sab,0px)]">
         <DevicesScreen userId={userId} onBack={() => setActiveScreen('main')} />
       </div>
     )}
     {activeScreen === 'storage' && (
-      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in pb-[var(--sab,0px)]">
         <StorageScreen onBack={() => setActiveScreen('main')} />
       </div>
     )}
     {activeScreen === 'ai' && (
-      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in">
+      <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl overflow-y-auto animate-fade-in pb-[var(--sab,0px)]">
         <AiScreen onBack={() => setActiveScreen('main')} worker={worker} />
       </div>
     )}
@@ -516,7 +516,7 @@ export default function SettingsModal({
     {activeScreen === 'appearance' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
           <button
             onClick={() => { hapticImpact("selection"); setActiveScreen('main'); }}
             className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
@@ -528,7 +528,7 @@ export default function SettingsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-grow overflow-y-auto px-5 py-6 scrollbar-none">
+        <div className="flex-grow overflow-y-auto px-5 pb-[calc(1.5rem+var(--sab,0px))] pt-6 scrollbar-none">
           <div className="flex flex-col gap-6 max-w-md mx-auto w-full pb-10">
             {/* Theme mode */}
             <div>
@@ -598,7 +598,7 @@ export default function SettingsModal({
     {activeScreen === 'security' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
           <button
             onClick={() => { hapticImpact("selection"); setActiveScreen('main'); }}
             className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
@@ -609,7 +609,7 @@ export default function SettingsModal({
           <span className="font-bold font-display text-slate-200 text-lg tracking-tight">Безопасность</span>
         </div>
 
-        <div className="flex-grow overflow-y-auto px-5 py-6 scrollbar-none">
+        <div className="flex-grow overflow-y-auto px-5 pb-[calc(1.5rem+var(--sab,0px))] pt-6 scrollbar-none">
           <div className="flex flex-col gap-6 max-w-md mx-auto w-full pb-10">
             {/* Auth methods */}
             <div>
@@ -750,7 +750,7 @@ export default function SettingsModal({
     {activeScreen === 'invites' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
           <button
             onClick={() => { hapticImpact("selection"); setActiveScreen('main'); }}
             className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
@@ -761,7 +761,7 @@ export default function SettingsModal({
           <span className="font-bold font-display text-slate-200 text-lg tracking-tight">Инвайты</span>
         </div>
 
-        <div className="flex-grow overflow-y-auto px-5 py-6 scrollbar-none">
+        <div className="flex-grow overflow-y-auto px-5 pb-[calc(1.5rem+var(--sab,0px))] pt-6 scrollbar-none">
           <div className="flex flex-col gap-4 max-w-md mx-auto w-full pb-10">
             <p className="text-xs text-slate-400 px-1">
               До 3 активных кодов. Каждый код одноразовый.
@@ -817,7 +817,7 @@ export default function SettingsModal({
     {activeScreen === 'notifications' && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
           <button
             onClick={() => { hapticImpact("selection"); setActiveScreen('main'); }}
             className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
@@ -829,7 +829,7 @@ export default function SettingsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-grow overflow-y-auto px-5 py-6 scrollbar-none">
+        <div className="flex-grow overflow-y-auto px-5 pb-[calc(1.5rem+var(--sab,0px))] pt-6 scrollbar-none">
           <div className="flex flex-col gap-5 max-w-md mx-auto w-full pb-10">
             {/* Push notifications */}
             <div>
@@ -938,7 +938,7 @@ export default function SettingsModal({
     {(activeScreen === 'main') && (
       <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-3xl flex flex-col select-none animate-fade-in text-slate-100 font-sans">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-4 pt-[calc(1rem+var(--sat,0px))] border-b border-slate-900 shrink-0">
           <button
             onClick={onClose}
             className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer"
@@ -950,7 +950,7 @@ export default function SettingsModal({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-grow overflow-y-auto px-5 py-3 scrollbar-none">
+        <div className="flex-grow overflow-y-auto px-5 pb-[calc(0.75rem+var(--sab,0px))] pt-3 scrollbar-none">
           <div className="flex flex-col gap-3 max-w-md mx-auto w-full">
 
             {/* ── Profile ── */}

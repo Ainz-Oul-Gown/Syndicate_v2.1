@@ -9,7 +9,7 @@ export interface InviteFriendScreenProps {
 
 export default function InviteFriendScreen({ friendsList, onBack, onInvite }: InviteFriendScreenProps) {
   return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950 px-6 pb-6 pt-[calc(1.5rem+var(--sat,0px))] overflow-y-auto flex flex-col">
+    <div className="fixed inset-0 z-[1000] bg-slate-950 px-6 pb-[calc(1.5rem+var(--sab,0px))] pt-[calc(1.5rem+var(--sat,0px))] overflow-y-auto flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <button onClick={onBack} className="text-primary font-medium">Назад</button>
         <span className="font-bold text-slate-200">Кого позвать?</span>

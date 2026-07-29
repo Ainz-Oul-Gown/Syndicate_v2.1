@@ -1555,7 +1555,7 @@ export default function App() {
     }
 
     return (
-        <div className="h-[100dvh] bg-slate-950 text-slate-100 select-none overflow-hidden flex flex-col relative pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]">
+        <div className="h-[100dvh] bg-slate-950 text-slate-100 select-none overflow-hidden flex flex-col relative">
             <StealthOverlay />
 
             {/* Primary alert wrapper for device approvals */}
@@ -1607,7 +1607,7 @@ export default function App() {
                 </AnimatedScreen>
             ) : (
                 <AnimatedScreen key="main-screen" screenKey="main">
-                <div className="flex flex-col h-full overflow-hidden px-3 pt-2 pb-4 flex-grow relative max-w-3xl mx-auto w-full">
+                <div className="flex flex-col h-full overflow-hidden px-3 pt-[env(safe-area-inset-top,0px)] flex-grow relative max-w-3xl mx-auto w-full">
                     {/* Header */}
                     <div className="flex items-center justify-between py-2 mb-3 border-b border-slate-900 flex-shrink-0">
                         <div
@@ -1745,7 +1745,7 @@ export default function App() {
                     </div>
 
                     {/* Chat Inbox list */}
-                    <div className="flex-grow flex flex-col gap-2 overflow-y-auto pb-12 pr-1">
+                    <div className="flex-grow flex flex-col gap-2 overflow-y-auto pb-[calc(3rem+env(safe-area-inset-bottom,0px))] pr-1">
                         {/* Filter computations */}
                         {(() => {
                             const filteredRequests = friendRequests.filter((req) =>

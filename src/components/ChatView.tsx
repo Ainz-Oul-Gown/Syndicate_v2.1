@@ -1961,7 +1961,7 @@ export default function ChatView({ chat, currentUser, onBack, worker }: ChatView
 
             {/* Deep Search screen */}
             {activeModal === 'search' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950 px-5 pb-5 pt-[calc(1.25rem+var(--sat,0px))] overflow-y-auto flex flex-col font-sans animate-fade-in">
+                <div className="fixed inset-0 z-[1000] bg-slate-950 px-5 pb-[calc(1.25rem+var(--sab,0px))] pt-[calc(1.25rem+var(--sat,0px))] overflow-y-auto flex flex-col font-sans animate-fade-in">
                     <div className="flex items-center justify-between pb-4 border-b border-slate-900 mb-6 shrink-0 max-w-3xl mx-auto w-full">
                         <button
                             onClick={() => setActiveModal('none')}
